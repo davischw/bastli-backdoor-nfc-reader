@@ -122,7 +122,7 @@ int main(int argc, char* argv[]) {
     for (;;) {
       boost::asio::streambuf buf;
 
-      size_t len = read_until(socket, buf, '\n', error);
+      read_until(socket, buf, '\n', error);
 
       if (error == boost::asio::error::eof) {
         BOOST_LOG_TRIVIAL(info) << "Connection closed by remote host";
