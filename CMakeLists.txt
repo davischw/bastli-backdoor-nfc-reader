@@ -24,13 +24,13 @@ add_subdirectory(dist/)
 add_definitions(-DBOOST_ALL_DYN_LINK)
 
 # Create main executable
-add_executable(nfc-reader src/nfc-reader.cpp)
+add_executable(nfc-reader src/nfc-reader.cpp src/bd_client.cpp)
 
 include_directories(${jsoncpp_INCLUDE_DIR})
 target_link_libraries(nfc-reader jsoncpp)
 
 # Look for Boost libraries
-find_package(Boost REQUIRED COMPONENTS system filesystem date_time thread log program_options)
+find_package(Boost REQUIRED COMPONENTS system filesystem date_time thread log program_options regex)
 
 if (Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
