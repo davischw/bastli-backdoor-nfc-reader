@@ -232,8 +232,10 @@ void BdClient::close_socket() {
 }
 
 void BdClient::handle_signals(const boost::system::error_code& error, int signal_number) {
+  BOOST_LOG_TRIVIAL(trace) << "BdClient::handle_signals";
+
   if (error == boost::asio::error::operation_aborted) {
-    // this means, the signal handlers were cancelled
+    // this means the signal handlers were cancelled
     return;
   }
 

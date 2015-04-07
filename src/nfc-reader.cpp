@@ -7,13 +7,6 @@
 
 #include<iostream>
 
-//Boost format (sprintf for C++)
-#include<boost/format.hpp>
-
-#include<boost/bind.hpp>
-
-//Boost Asio (Sockets)
-#include<boost/asio.hpp>
 
 //Boost Logging
 #include<boost/log/trivial.hpp>
@@ -21,17 +14,11 @@
 //Boost program options
 #include<boost/program_options.hpp>
 
-//JSON library
-#include "json.h"
-
 
 #include "bd_client.hpp"
 
 namespace logging = boost::log;
 namespace po = boost::program_options;
-
-using boost::asio::ip::tcp;
-
 
 
 int main(int argc, char* argv[]) {
@@ -75,12 +62,6 @@ int main(int argc, char* argv[]) {
     BOOST_LOG_TRIVIAL(info) << "Bastli NFC-Reader v0.0.1 starting";
 
     client.run(host, port);
-
-
-
-
-    // Start asynchronous processing
-
   } catch (std::exception& e) {
     BOOST_LOG_TRIVIAL(error) << e.what();
   }
