@@ -20,7 +20,8 @@ class BdClient {
   private:
 
     // Start connection with remote server
-    void start(tcp::resolver::iterator endpoint_iter);
+    void start(const boost::system::error_code& ec, 
+        tcp::resolver::iterator endpoint_iter);
 
     // Stop the client
     void stop();
@@ -56,7 +57,7 @@ class BdClient {
     std::string auth_token_;
     bool registered_ = false;
 
-    bool stopped_ = false;
+    bool stopped_ = true;
 
 
     //Connection variables

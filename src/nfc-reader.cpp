@@ -14,8 +14,9 @@
 //Boost program options
 #include<boost/program_options.hpp>
 
-
 #include "bd_client.hpp"
+
+#include <nfc/nfc.h>
 
 namespace logging = boost::log;
 namespace po = boost::program_options;

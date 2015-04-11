@@ -11,9 +11,11 @@ void BdClient::run(std::string host, std::string port) {
 
     tcp::resolver::query query(host, port);
 
-    auto endpoint_iterator = resolver.resolve(query);
+    resolver.async_resolve(query,
+        boost::bind(&BdClient::start, this, 
+          boost::asio::placeholders::error,
+          boost::asio::placeholders::iterator));
 
-    start(endpoint_iterator);
 
     // Setup signal handling
     signals.async_wait(boost::bind(&BdClient::handle_signals, this, 
@@ -22,7 +24,15 @@ void BdClient::run(std::string host, std::string port) {
     io.run();
 }
 
-void BdClient::start(tcp::resolver::iterator endpoint_iter) {
+void BdClient::start(const boost::system::error_code& ec,
+    tcp::resolver::iterator endpoint_iter) {
+  if (ec) {
+   BOOST_LOG_TRIVIAL(error) << "Failed to resolve address of backdoor server"; 
+   throw boost::system::system_error(ec);
+  }
+
+  stopped_ = false;
+
   start_connect(endpoint_iter);
 }
 

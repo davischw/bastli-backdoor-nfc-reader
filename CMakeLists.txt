@@ -26,6 +26,9 @@ add_definitions(-DBOOST_ALL_DYN_LINK)
 # Create main executable
 add_executable(nfc-reader src/nfc-reader.cpp src/bd_client.cpp)
 
+# Create test executable for nfc personalisation
+add_executable(nfc-personalize src/nfc_personalize.cpp)
+
 include_directories(${jsoncpp_INCLUDE_DIR})
 target_link_libraries(nfc-reader jsoncpp)
 
@@ -35,5 +38,21 @@ find_package(Boost REQUIRED COMPONENTS system filesystem date_time thread log pr
 if (Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
   target_link_libraries(nfc-reader ${Boost_LIBRARIES})
+  target_link_libraries(nfc-personalize ${Boost_LIBRARIES})
 endif (Boost_FOUND)
 
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/modules)
+
+
+
+# Look for libnfc
+find_package(libnfc REQUIRED)
+
+include_directories(${LIBNFC_INCLUDE_DIR})
+target_link_libraries(nfc-personalize ${LIBNFC_LIBRARY})
+
+# Look for libfreefare
+find_package(libfreefare REQUIRED)
+
+include_directories(${LIBFREEFARE_INCLUDE_DIR})
+target_link_libraries(nfc-personalize ${LIBFREEFARE_LIBRARY})
