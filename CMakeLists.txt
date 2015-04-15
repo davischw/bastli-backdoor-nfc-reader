@@ -43,7 +43,16 @@ endif (Boost_FOUND)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/modules)
 
-
+# Use PThreads
+set(CMAKE_THREAD_PREFER_PTHREAD 1)
+set(THREADS_PREFER_PTHREAD_FLAG 1)
+find_package(Threads REQUIRED)
+if (CMAKE_USE_PTHREADS_INIT)
+  #target_link_libraries(nfc-reader Threads::Threads)
+  #	target_link_libraries(nfc-personalize Threads::Threads)
+else()
+	message(FATAL_ERROR "PThread not found, exiting")
+endif()
 
 # Look for libnfc
 find_package(libnfc REQUIRED)
