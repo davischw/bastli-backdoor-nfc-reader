@@ -9,3 +9,7 @@ install_manifest.txt
 # Ignore build output
 bin/
 lib/
+
+
+# Ignore IDE stuff
+.idea/
