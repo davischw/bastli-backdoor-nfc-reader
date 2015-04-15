@@ -27,7 +27,7 @@ add_definitions(-DBOOST_ALL_DYN_LINK)
 add_executable(nfc-reader src/nfc-reader.cpp src/bd_client.cpp)
 
 # Create test executable for nfc personalisation
-add_executable(nfc-personalize src/nfc_personalize.cpp)
+add_executable(nfc-personalize src/nfc_personalize.cpp src/NfcContext.cpp)
 
 include_directories(${jsoncpp_INCLUDE_DIR})
 target_link_libraries(nfc-reader jsoncpp)
@@ -56,3 +56,5 @@ find_package(libfreefare REQUIRED)
 
 include_directories(${LIBFREEFARE_INCLUDE_DIR})
 target_link_libraries(nfc-personalize ${LIBFREEFARE_LIBRARY})
+
+include_directories(src/)
