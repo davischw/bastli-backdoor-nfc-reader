@@ -27,7 +27,7 @@ class NfcContext {
     };
 
 
-    std::unique_ptr< std::vector<std::string> > list_devices(size_t max_devices);
+    std::vector<std::string> list_devices(size_t max_devices);
     std::unique_ptr<NfcDevice> open(std::string connstring);
 
   private:
