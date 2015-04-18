@@ -16,31 +16,23 @@ int main() {
   NfcContext context;
 
   //Look for NFC readers
-  
   auto devices = context.list_devices(max_devices);
 
-  if (devices->empty()) {
+  if (devices.empty()) {
     BOOST_LOG_TRIVIAL(error) << "No NFC devices found";
     return 1;
   } else {
-    BOOST_LOG_TRIVIAL(info) << "Found " << devices->size() << " devices";
-    for (size_t i = 0; i < devices->size(); i++) {
-      BOOST_LOG_TRIVIAL(debug) << "Device " << i + 1 << ": " << (*devices)[i];
+    BOOST_LOG_TRIVIAL(info) << "Found " << devices.size() << " devices";
+    for (size_t i = 0; i < devices.size(); i++) {
+      BOOST_LOG_TRIVIAL(debug) << "Device " << i + 1 << ": " << devices[i];
     }
 
-    nfc_device *device = nullptr;
     //Just connect to the first device
-    device = context.open((*devices)[0]);
-
-    if (device == nullptr) {
-      BOOST_LOG_TRIVIAL(fatal) << "Failed to open device " << (*devices)[0];
-
-      return 1;
-    }
+    auto device = context.open(devices[0]);
 
     // do stuff with the device
     MifareTag *tags = nullptr;
-    tags = freefare_get_tags(device);
+    tags = freefare_get_tags(device->getRawPointer());
     if (tags == nullptr) {
       BOOST_LOG_TRIVIAL(warning) << "Failed to listen tags";
     } else {
