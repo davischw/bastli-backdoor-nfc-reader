@@ -6,7 +6,7 @@
 #include<NfcContext.hpp>
 
 uint8_t null_key[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-uint8_t new_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77};
+uint8_t bastli_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77};
 
 int main() {
 
@@ -88,6 +88,31 @@ int main() {
             freefare_perror(tags[i], "mifare_desfire_authenticate");
           } else {
             BOOST_LOG_TRIVIAL(info) << "Successful authentication, card is using the default key";
+            BOOST_LOG_TRIVIAL(info) << "Setting TOP SECRET bastli key...";
+
+            MifareDESFireKey new_key = mifare_desfire_des_key_new(bastli_key);
+            mifare_desfire_key_set_version(new_key, 1);
+
+            res = mifare_desfire_change_key(tags[i], 0, new_key, default_key);
+            free(new_key);
+
+	    if (res < 0) {
+	      freefare_perror(tags[i], "mifare_desfire_change_key");
+            } else {
+              BOOST_LOG_TRIVIAL(info) << "Verifying that key has been changed...";
+              version = 5;
+              res = mifare_desfire_get_key_version(tags[i], 0, &version);
+              if (res < 0) {
+                BOOST_LOG_TRIVIAL(error) << "Failed to get key version";
+      	      } else {
+                if (version == 1) {
+                   BOOST_LOG_TRIVIAL(info) << "Key verified";
+                } else {
+                   BOOST_LOG_TRIVIAL(error) << "Key verification failed";
+                }
+              }
+            }
+             
           }
 
           mifare_desfire_key_free(default_key);
@@ -104,6 +129,8 @@ int main() {
     }
 
   }
+
+  BOOST_LOG_TRIVIAL(info) << "Bastli NFC-Reader shutting down, goodbye";
 
   return 0;
 };
