@@ -1,0 +1,10 @@
+{
+	OpenSSL_DES_encrypt1
+	Memcheck:Value4
+	fun:DES_encrypt1
+}
+{
+   OpensSSL_DES_set_key_unchecked
+   Memcheck:Value4
+   fun:DES_set_key_unchecked
+}

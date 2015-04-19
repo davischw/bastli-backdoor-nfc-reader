@@ -1,5 +1,8 @@
 #include <NfcContext.hpp>
 
+std::shared_ptr<NfcContext> NfcContext::init() {
+  return std::shared_ptr<NfcContext>(new NfcContext);
+}
 
 std::vector<std::string> NfcContext::list_devices(size_t max_devices) {
   nfc_connstring *devices = new nfc_connstring[max_devices];
@@ -27,7 +30,7 @@ std::unique_ptr<NfcDevice> NfcContext::open(std::string connection_string) {
 
     device = nfc_open(_context, connection_string.c_str());
 
-    return std::unique_ptr<NfcDevice>(new NfcDevice(std::shared_ptr<NfcContext>(this), device));
+    return std::unique_ptr<NfcDevice>(new NfcDevice(this->shared_from_this(), device));
 }
 
 nfc_device *NfcDevice::getRawPointer() {

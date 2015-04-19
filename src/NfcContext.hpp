@@ -10,16 +10,11 @@
 
 class NfcDevice;
 
-class NfcContext {
+class NfcContext :
+  public std::enable_shared_from_this<NfcContext> {
+
   public:
-
-    NfcContext() {
-      nfc_init(&_context);
-
-      if (_context == nullptr) {
-        throw std::runtime_error("Failed to initialize NFC Context");
-      }
-    };
+    static std::shared_ptr<NfcContext> init();
 
     ~NfcContext() {
       //Freeing nfc_context
@@ -31,6 +26,14 @@ class NfcContext {
     std::unique_ptr<NfcDevice> open(std::string connstring);
 
   private:
+    NfcContext() {
+      nfc_init(&_context);
+
+      if (_context == nullptr) {
+        throw std::runtime_error("Failed to initialize NFC Context");
+      }
+    };
+
     nfc_context* _context = nullptr;
 };
 
@@ -40,11 +43,11 @@ public:
     NfcDevice(std::shared_ptr<NfcContext> context, nfc_device* device)
             : _context(context)
     {
-        if (device == nullptr) {
-            throw std::runtime_error("device pointer not set to an object");
-        }
+      _device = device;
 
-        _device = device;
+      if (_device == nullptr) {
+        throw std::runtime_error("Failed to open NFC device");
+      }
     }
 
     ~NfcDevice() {
@@ -56,6 +59,6 @@ public:
 
 private:
     std::shared_ptr<NfcContext> _context;
-    nfc_device* _device;
+    nfc_device* _device = nullptr;
 };
 #endif //NFC_CONTEXT_HPP
