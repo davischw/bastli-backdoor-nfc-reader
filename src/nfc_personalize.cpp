@@ -75,7 +75,7 @@ int main() {
           if (res < 0) {
             BOOST_LOG_TRIVIAL(warning) << "Failed to get key version";
           } else {
-             // for some reason Boost Log does not print an zero interger
+             // for some reason Boost Log does not print a zero interger
              //BOOST_LOG_TRIVIAL(info) << "Master key version: " << version;
              printf("Master key version: %d\n", version);
           }
