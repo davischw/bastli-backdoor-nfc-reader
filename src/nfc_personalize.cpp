@@ -18,8 +18,17 @@ int main() {
 
   const size_t max_devices = 8;
 
-  //Setup nfc context
-  auto context = NfcContext::init();
+  std::shared_ptr<NfcContext> context;
+  
+
+  try {
+  	//Setup nfc context
+  	context = NfcContext::init();
+
+  } catch (std::runtime_error &e) {
+  	BOOST_LOG_TRIVIAL(fatal) << "Error during NFC initialization: " << e.what();
+        return 1;
+  }
 
   //Look for NFC readers
   auto devices = context->list_devices(max_devices);
