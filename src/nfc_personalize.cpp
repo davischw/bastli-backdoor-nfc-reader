@@ -6,7 +6,10 @@
 #include<NfcContext.hpp>
 
 uint8_t null_key[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-uint8_t bastli_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77};
+uint8_t bastli_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77};
+//uint8_t bastli_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77};
+
+const uint8_t bastli_key_version = 1;
 
 
 void personalize_card(MifareTag tag, MifareDESFireKey new_key);
@@ -77,8 +80,9 @@ int main() {
              printf("Master key version: %d\n", version);
           }
 
-	  MifareDESFireKey new_key = mifare_desfire_des_key_new(bastli_key);
-          mifare_desfire_key_set_version(new_key, 1);
+	  MifareDESFireKey new_key = mifare_desfire_aes_key_new_with_version(bastli_key, bastli_key_version);
+          //WARNING: setting the key version with the function below does not work!
+	  //mifare_desfire_key_set_version(new_key, bastli_key_version);
 
 	  if (version == 0) { 
               //key version 0 is used for default key
@@ -86,7 +90,7 @@ int main() {
 
 	      personalize_card(tags[i], new_key);
           } else {
-            if (version == 1) {
+            if (version == bastli_key_version) {
 
 	      res = mifare_desfire_authenticate(tags[i], 0, new_key);
 	      if (res < 0) {
@@ -164,7 +168,7 @@ void personalize_card(MifareTag tag, MifareDESFireKey new_key) {
       return;
     }
       
-    if (version == 1) {
+    if (version == bastli_key_version) {
       BOOST_LOG_TRIVIAL(info) << "Key verified";
       BOOST_LOG_TRIVIAL(info) << "Card successfully personalized";
     } else {
