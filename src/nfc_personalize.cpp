@@ -7,12 +7,14 @@
 
 uint8_t null_key[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 uint8_t bastli_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77};
-//uint8_t bastli_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77};
+
+const uint32_t bastli_backdoor_aid = 0x5;
 
 const uint8_t bastli_key_version = 1;
 
 
 void personalize_card(MifareTag tag, MifareDESFireKey new_key);
+void list_applications(MifareTag tag);
 
 int main() {
 
@@ -80,6 +82,10 @@ int main() {
              printf("Master key version: %d\n", version);
           }
 
+
+          //Try to list all applications
+          list_applications(tags[i]);
+         
 	  MifareDESFireKey new_key = mifare_desfire_aes_key_new_with_version(bastli_key, bastli_key_version);
           //WARNING: setting the key version with the function below does not work!
 	  //mifare_desfire_key_set_version(new_key, bastli_key_version);
@@ -100,6 +106,23 @@ int main() {
 	        BOOST_LOG_TRIVIAL(info) << "Successful authentication, card is personalized with Bastli key";
 
                 // Test code...
+
+                BOOST_LOG_TRIVIAL(info) << "Trying to delete Bastli application";
+                MifareDESFireAID bastli_aid = mifare_desfire_aid_new(bastli_backdoor_aid);
+                
+                if (bastli_aid == nullptr) {
+                  BOOST_LOG_TRIVIAL(error) << "Failed to create Bastli AID";
+                  freefare_perror(tags[i], "mifare_desfire_aid_new");
+                } else {
+                  res = mifare_desfire_delete_application(tags[i], bastli_aid);
+                  if (res < 0) {
+                    freefare_perror(tags[i], "mifare_desfire_delete_application");
+                  }
+                  free(bastli_aid);
+                }
+  
+               
+                
                 BOOST_LOG_TRIVIAL(info) << "Trying to reset card to default key";
                 MifareDESFireKey default_key = mifare_desfire_des_key_new_with_version(null_key);
                 res = mifare_desfire_change_key(tags[i], 0, default_key, new_key);
@@ -168,12 +191,87 @@ void personalize_card(MifareTag tag, MifareDESFireKey new_key) {
       return;
     }
       
-    if (version == bastli_key_version) {
-      BOOST_LOG_TRIVIAL(info) << "Key verified";
-      BOOST_LOG_TRIVIAL(info) << "Card successfully personalized";
-    } else {
+    if (version != bastli_key_version) {
       BOOST_LOG_TRIVIAL(error) << "Key verification failed";
+      mifare_desfire_key_free(default_key);
+      return;
     }
 
+    BOOST_LOG_TRIVIAL(info) << "Key verified";
+
+
+    BOOST_LOG_TRIVIAL(trace) << "Authenticating with new key...";
+    res = mifare_desfire_authenticate(tag, 0, new_key);
+    if (res < 0) {
+      BOOST_LOG_TRIVIAL(error) << "Failed to authenticate with new key";
+      freefare_perror(tag, "mifare_desfire_set_default_key");
+    }
+    
+
+    res = mifare_desfire_set_default_key(tag, default_key);
     mifare_desfire_key_free(default_key);
+
+    if (res < 0) {
+      BOOST_LOG_TRIVIAL(warning) << "Failed to set default key!";
+      freefare_perror(tag, "mifare_desfire_set_default_key");
+      return;
+    }
+
+    BOOST_LOG_TRIVIAL(info) << "Creating application";
+    MifareDESFireAID bastli_aid = mifare_desfire_aid_new(bastli_backdoor_aid);
+    
+    if (bastli_aid == nullptr) {
+      BOOST_LOG_TRIVIAL(error) << "Failed to create Bastli AID";
+      freefare_perror(tag, "mifare_desfire_aid_new");
+      return;
+    }
+
+    //create new application with the default key
+    //
+    // key settings:
+    // aaaa b c d e
+    //            ^------ allow change master key
+    //          ^-------- free directory list without master key
+    //        ^---------- free create /delete without master key
+    //      ^------------ configuration changeable
+    // ^^^^-------------- ChangeKey access rights:
+    //                     -       0x0: Application master key is needed to change any key
+    //                     - 0x1 - 0xD: Authentication with the specified key is necessary to change any key
+    //                     -       0xE: Authentication with the key to be changed (same KeyNo) 
+    //                                  is necessary to change any key
+    //                     -       0xF: All keys (except application master key, see bit e) 
+    //                                  within this application are frozen
+    res = mifare_desfire_create_application(tag, bastli_aid, 0b00001001, 1);
+    if (res < 0) {
+      BOOST_LOG_TRIVIAL(warning) << "Failed to create application!";
+      freefare_perror(tag, "mifare_desfire_create_application");
+      free(bastli_aid);
+      return;
+    }
+
+    list_applications(tag);
+    
+    
+    free(bastli_aid);
+    BOOST_LOG_TRIVIAL(info) << "Card successfully personalized";
+
+    return;
+}
+
+void list_applications(MifareTag tag) {
+  size_t app_count;
+  MifareDESFireAID* aids = nullptr;
+
+  int res = mifare_desfire_get_application_ids(tag, &aids, &app_count);
+  if (res < 0) {
+    BOOST_LOG_TRIVIAL(warning) << "Failed to get application ids";
+    freefare_perror(tag, "mifare_desfire_get_application_ids");
+  } else {
+    BOOST_LOG_TRIVIAL(info) << "Found " << app_count << " applications: ";
+    for (size_t j = 0; j < app_count; j++) {
+	BOOST_LOG_TRIVIAL(info) << "Application id: " << mifare_desfire_aid_get_aid(aids[j]);  
+    }
+  }
+
+  mifare_desfire_free_application_ids(aids);
 }
