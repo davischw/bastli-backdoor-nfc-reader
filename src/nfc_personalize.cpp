@@ -15,6 +15,7 @@ const uint8_t bastli_key_version = 1;
 
 void personalize_card(MifareTag tag, MifareDESFireKey new_key);
 void list_applications(MifareTag tag);
+void read_token(MifareTag tag);
 
 int main() {
 
@@ -114,10 +115,13 @@ int main() {
 	      } else {
 	        BOOST_LOG_TRIVIAL(info) << "Successful authentication, card is personalized with Bastli key";
 
+                read_token(tags[i]);
+               
                 // Test code...
 
                 BOOST_LOG_TRIVIAL(info) << "Trying to delete Bastli application";
                 MifareDESFireAID bastli_aid = mifare_desfire_aid_new(bastli_backdoor_aid);
+
                 
                 if (bastli_aid == nullptr) {
                   BOOST_LOG_TRIVIAL(error) << "Failed to create Bastli AID";
@@ -129,21 +133,28 @@ int main() {
                   }
                   free(bastli_aid);
                 }
-  
-               
+
                 
-                BOOST_LOG_TRIVIAL(info) << "Trying to reset card to default key";
-                MifareDESFireKey default_key = mifare_desfire_des_key_new_with_version(null_key);
-                res = mifare_desfire_change_key(tags[i], 0, default_key, new_key);
-                
-                if (res < 0) {
-                  freefare_perror(tags[i], "mifare_desfire_change_key");
-                } else {
-                  BOOST_LOG_TRIVIAL(info) << "Successfully reset card to default key";
+	        res = mifare_desfire_authenticate(tags[i], 0, new_key);
+	        if (res < 0) {
+	          freefare_perror(tags[i], "mifare_desfire_authenticate");
+                  BOOST_LOG_TRIVIAL(error) << "Failed to authenticate with bastli key, unable to reset key";
+	        } else {
+                 
+                  MifareDESFireKey default_key = mifare_desfire_des_key_new_with_version(null_key);
+                  //authenticate with default_key
+                  
+                  BOOST_LOG_TRIVIAL(info) << "Trying to reset card to default key";
+                  res = mifare_desfire_change_key(tags[i], 0, default_key, new_key);
+                  
+                  if (res < 0) {
+                    freefare_perror(tags[i], "mifare_desfire_change_key");
+                  } else {
+                    BOOST_LOG_TRIVIAL(info) << "Successfully reset card to default key";
+                  }
+	           
+                  mifare_desfire_key_free(default_key);
                 }
-	         
-                
-                mifare_desfire_key_free(default_key);
                 // End test code...
 	      }
             }
@@ -218,11 +229,10 @@ void personalize_card(MifareTag tag, MifareDESFireKey new_key) {
     
 
     res = mifare_desfire_set_default_key(tag, default_key);
-    mifare_desfire_key_free(default_key);
-
     if (res < 0) {
       BOOST_LOG_TRIVIAL(warning) << "Failed to set default key!";
       freefare_perror(tag, "mifare_desfire_set_default_key");
+      mifare_desfire_key_free(default_key);
       return;
     }
 
@@ -232,6 +242,7 @@ void personalize_card(MifareTag tag, MifareDESFireKey new_key) {
     if (bastli_aid == nullptr) {
       BOOST_LOG_TRIVIAL(error) << "Failed to create Bastli AID";
       freefare_perror(tag, "mifare_desfire_aid_new");
+      mifare_desfire_key_free(default_key);
       return;
     }
 
@@ -255,16 +266,113 @@ void personalize_card(MifareTag tag, MifareDESFireKey new_key) {
       BOOST_LOG_TRIVIAL(warning) << "Failed to create application!";
       freefare_perror(tag, "mifare_desfire_create_application");
       free(bastli_aid);
+      mifare_desfire_key_free(default_key);
       return;
     }
 
-    list_applications(tag);
-    
-    
+    //list_applications(tag);
+
+    res = mifare_desfire_select_application(tag, bastli_aid);
     free(bastli_aid);
+    if (res < 0) {
+      BOOST_LOG_TRIVIAL(warning) << "Failed to select Bastli application";
+      freefare_perror(tag, "mifare_desfire_select_application");
+      mifare_desfire_key_free(default_key);
+      return;
+    }
+
+    //authenticate with default key
+    res = mifare_desfire_authenticate(tag, 0, default_key);
+    mifare_desfire_key_free(default_key);
+    if (res < 0) {
+      BOOST_LOG_TRIVIAL(warning) << "Failed to authenticate (application)";
+      freefare_perror(tag, "mifare_desfire_authenticate");
+      return;
+    }
+
+    //create a file
+    //
+    // communication settings: 11 -> 3 for fully enciphered
+    // access rights:           0 -> key 0 (application key) for everything..
+    // size:                   32 bytes 
+    res = mifare_desfire_create_std_data_file(tag, 0, 3, 0, 32);
+    if (res < 0) {
+      BOOST_LOG_TRIVIAL(warning) << "Failed to create data file";
+      freefare_perror(tag, "mifare_desfire_create_std_data_file");
+      return;
+    }
+
+
+    uint32_t token = 0xdeadbeef;
+
+    res = mifare_desfire_write_data(tag, 0, 0, sizeof(token), &token);
+    if (res != sizeof(token)) {
+      BOOST_LOG_TRIVIAL(warning) << "Failed to write all data!";
+      return;
+    }
+
+
+    BOOST_LOG_TRIVIAL(info) << "Data file created";
+
+    //write data into the file
+    
+    
     BOOST_LOG_TRIVIAL(info) << "Card successfully personalized";
 
     return;
+}
+
+
+void read_token(MifareTag tag) {
+  MifareDESFireKey default_key = mifare_desfire_des_key_new_with_version(null_key);
+  if (default_key == nullptr) {
+    BOOST_LOG_TRIVIAL(error) << "Failed to create default key";
+    return;
+  }
+
+  MifareDESFireAID bastli_aid = mifare_desfire_aid_new(bastli_backdoor_aid);
+  if (bastli_aid == nullptr) {
+    BOOST_LOG_TRIVIAL(error) << "Failed to create Bastli AID";
+    freefare_perror(tag, "mifare_desfire_aid_new");
+    mifare_desfire_key_free(default_key);
+    return;
+  }
+
+
+  int res = mifare_desfire_select_application(tag, bastli_aid);
+  if (res < 0) {
+    freefare_perror(tag, "mifare_desfire_select_application");
+
+    mifare_desfire_key_free(default_key);
+    free(bastli_aid);
+    return;
+  }
+      
+  //authenticate with default_key
+  res = mifare_desfire_authenticate(tag, 0, default_key);
+  if (res < 0) {
+    freefare_perror(tag, "mifare_desfire_authenticate");
+
+    mifare_desfire_key_free(default_key);
+    free(bastli_aid);
+    return;
+  }
+
+  uint32_t data = 0;
+  res = mifare_desfire_read_data(tag, 0, 0, sizeof(data), &data);
+  if (res < 0) {
+    BOOST_LOG_TRIVIAL(warning) << "Failed to read data...";
+    freefare_perror(tag, "mifare_desfire_read_data");
+
+    mifare_desfire_key_free(default_key);
+    free(bastli_aid);
+    return;
+  }
+
+  BOOST_LOG_TRIVIAL(info) << "Successfully read token from card: " << data;
+
+  mifare_desfire_key_free(default_key);
+  free(bastli_aid);
 }
 
 void list_applications(MifareTag tag) {
@@ -279,7 +387,39 @@ void list_applications(MifareTag tag) {
     BOOST_LOG_TRIVIAL(info) << "Found " << app_count << " applications: ";
     for (size_t j = 0; j < app_count; j++) {
 	BOOST_LOG_TRIVIAL(info) << "Application id: " << mifare_desfire_aid_get_aid(aids[j]);  
+        
+        //select the application
+        res = mifare_desfire_select_application(tag, aids[j]);
+        if (res < 0) {
+          BOOST_LOG_TRIVIAL(trace) << "Failed to select application";
+          continue;
+        }
+
+        //list all files
+        size_t num_files;
+        uint8_t *files = nullptr;
+        res = mifare_desfire_get_file_ids(tag, &files, &num_files);
+        if (res < 0) {
+          BOOST_LOG_TRIVIAL(trace) << "Failed to get list of file ids..";
+          freefare_perror(tag, "mifare_desfire_get_file_ids");
+        } else {
+          BOOST_LOG_TRIVIAL(trace) << "Application has " << num_files << " files";
+          
+          for (size_t i = 0; i < num_files; i++) {
+            BOOST_LOG_TRIVIAL(trace) << "File with id " << files[i];
+          }
+        }
+
+        if (files != nullptr) {
+          free(files);
+        }
     }
+  }
+
+  //select default / root application
+  res = mifare_desfire_select_application(tag, nullptr);
+  if (res < 0) {
+     BOOST_LOG_TRIVIAL(warning) << "Failed to select default application!";
   }
 
   mifare_desfire_free_application_ids(aids);
