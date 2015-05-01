@@ -14,7 +14,7 @@ const uint32_t bastli_backdoor_aid = 0x5;
 const uint8_t bastli_key_version = 1;
 
 
-void personalize_card(MifareTag tag, MifareDESFireKey new_key);
+void personalize_card(MifareTag tag, MifareDesfireKey new_key);
 void list_applications(MifareTag tag);
 void read_token(MifareTag tag);
 
@@ -97,7 +97,7 @@ int main() {
           //Try to list all applications
           list_applications(tags[i]);
          
-	  MifareDESFireKey new_key = mifare_desfire_aes_key_new_with_version(bastli_key, bastli_key_version);
+	  auto new_key = MifareDesfireKey::create_aes_key_with_version(bastli_key, bastli_key_version);
           //WARNING: setting the key version with the function below does not work!
 	  //mifare_desfire_key_set_version(new_key, bastli_key_version);
 
@@ -109,7 +109,7 @@ int main() {
           } else {
             if (version == bastli_key_version) {
 
-	      res = mifare_desfire_authenticate(tags[i], 0, new_key);
+	      res = mifare_desfire_authenticate(tags[i], 0, new_key.get_raw());
 	      if (res < 0) {
 	        freefare_perror(tags[i], "mifare_desfire_authenticate");
                 BOOST_LOG_TRIVIAL(warning) << "Card is neither using default key nor bastli key, ignoring card";
@@ -136,17 +136,17 @@ int main() {
                 }
 
                 
-	        res = mifare_desfire_authenticate(tags[i], 0, new_key);
+	        res = mifare_desfire_authenticate(tags[i], 0, new_key.get_raw());
 	        if (res < 0) {
 	          freefare_perror(tags[i], "mifare_desfire_authenticate");
                   BOOST_LOG_TRIVIAL(error) << "Failed to authenticate with bastli key, unable to reset key";
 	        } else {
                  
-                  MifareDesfireKey default_key(null_key);
+                  auto default_key = MifareDesfireKey::create_des_key(null_key);
                   //authenticate with default_key
                   
                   BOOST_LOG_TRIVIAL(info) << "Trying to reset card to default key";
-                  res = mifare_desfire_change_key(tags[i], 0, default_key.get_raw(), new_key);
+                  res = mifare_desfire_change_key(tags[i], 0, default_key.get_raw(), new_key.get_raw());
                   
                   if (res < 0) {
                     freefare_perror(tags[i], "mifare_desfire_change_key");
@@ -158,8 +158,6 @@ int main() {
 	      }
             }
           }
-	  free(new_key);
-
 
           res = mifare_desfire_disconnect(tags[i]);
           if (res < 0) {
@@ -179,8 +177,8 @@ int main() {
   return 0;
 };
 
-void personalize_card(MifareTag tag, MifareDESFireKey new_key) {
-    MifareDesfireKey default_key(null_key);
+void personalize_card(MifareTag tag, MifareDesfireKey new_key) {
+    auto default_key = MifareDesfireKey::create_des_key(null_key);
     int res = mifare_desfire_authenticate(tag, 0, default_key.get_raw());
 
     if (res < 0) {
@@ -191,7 +189,7 @@ void personalize_card(MifareTag tag, MifareDESFireKey new_key) {
     BOOST_LOG_TRIVIAL(info) << "Successful authentication, card is using the default key";
     BOOST_LOG_TRIVIAL(info) << "Setting TOP SECRET bastli key...";
 
-    res = mifare_desfire_change_key(tag, 0, new_key, default_key.get_raw());
+    res = mifare_desfire_change_key(tag, 0, new_key.get_raw(), default_key.get_raw());
 
     if (res < 0) {
       freefare_perror(tag, "mifare_desfire_change_key");
@@ -216,7 +214,7 @@ void personalize_card(MifareTag tag, MifareDESFireKey new_key) {
 
 
     BOOST_LOG_TRIVIAL(trace) << "Authenticating with new key...";
-    res = mifare_desfire_authenticate(tag, 0, new_key);
+    res = mifare_desfire_authenticate(tag, 0, new_key.get_raw());
     if (res < 0) {
       BOOST_LOG_TRIVIAL(error) << "Failed to authenticate with new key";
       freefare_perror(tag, "mifare_desfire_set_default_key");
@@ -315,7 +313,7 @@ void personalize_card(MifareTag tag, MifareDESFireKey new_key) {
 
 void read_token(MifareTag tag) {
 
-  MifareDesfireKey default_key(null_key);
+  auto default_key = MifareDesfireKey::create_des_key(null_key);
 
   MifareDESFireAID bastli_aid = mifare_desfire_aid_new(bastli_backdoor_aid);
   if (bastli_aid == nullptr) {
