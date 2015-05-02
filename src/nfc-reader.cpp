@@ -5,14 +5,13 @@
  *                                                               *
  *****************************************************************/
 
-#include<iostream>
+#include <iostream>
 
+// Boost Logging
+#include <boost/log/trivial.hpp>
 
-//Boost Logging
-#include<boost/log/trivial.hpp>
-
-//Boost program options
-#include<boost/program_options.hpp>
+// Boost program options
+#include <boost/program_options.hpp>
 
 #include "bd_client.hpp"
 
@@ -21,15 +20,12 @@
 namespace logging = boost::log;
 namespace po = boost::program_options;
 
-
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
   po::options_description desc("Allowed options");
-  desc.add_options()
-    ("help", "show help message")
-    ("host", po::value<std::string>(), "backdoor server host")
-    ("port", po::value<std::string>(), "backdoor server port")
-    ("token", po::value<std::string>(), "authentication token")
-  ;
+  desc.add_options()("help", "show help message")(
+      "host", po::value<std::string>(), "backdoor server host")(
+      "port", po::value<std::string>(), "backdoor server port")(
+      "token", po::value<std::string>(), "authentication token");
 
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -45,7 +41,6 @@ int main(int argc, char* argv[]) {
     std::cout << desc << std::endl;
     return 1;
   }
-
 
   if (!vm.count("token")) {
     std::cout << "Authentication token is required!" << std::endl;
@@ -63,10 +58,9 @@ int main(int argc, char* argv[]) {
     BOOST_LOG_TRIVIAL(info) << "Bastli NFC-Reader v0.0.1 starting";
 
     client.run(host, port);
-  } catch (std::exception& e) {
+  } catch (std::exception &e) {
     BOOST_LOG_TRIVIAL(error) << e.what();
   }
-
 
   BOOST_LOG_TRIVIAL(info) << "Program finished, shutting down";
 

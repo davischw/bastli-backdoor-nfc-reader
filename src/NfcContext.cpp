@@ -21,18 +21,18 @@ std::vector<std::string> NfcContext::list_devices(size_t max_devices) {
 }
 
 std::unique_ptr<NfcDevice> NfcContext::open(std::string connection_string) {
-    //Max length for a connection string is NFC_BUFSIZE_CONNSTRING
-    if (connection_string.length() > NFC_BUFSIZE_CONNSTRING) {
-      throw std::runtime_error("connection_string is too long, maximum length is given by NFC_BUFSIZE_CONNSTRING");
-    }
+  // Max length for a connection string is NFC_BUFSIZE_CONNSTRING
+  if (connection_string.length() > NFC_BUFSIZE_CONNSTRING) {
+    throw std::runtime_error("connection_string is too long, maximum length is "
+                             "given by NFC_BUFSIZE_CONNSTRING");
+  }
 
-    nfc_device *device = nullptr;
+  nfc_device *device = nullptr;
 
-    device = nfc_open(_context, connection_string.c_str());
+  device = nfc_open(_context, connection_string.c_str());
 
-    return std::unique_ptr<NfcDevice>(new NfcDevice(this->shared_from_this(), device));
+  return std::unique_ptr<NfcDevice>(
+      new NfcDevice(this->shared_from_this(), device));
 }
 
-nfc_device *NfcDevice::getRawPointer() {
-    return _device;
-}
+nfc_device *NfcDevice::getRawPointer() { return _device; }

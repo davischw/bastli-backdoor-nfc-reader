@@ -4,31 +4,31 @@
 
 void BdClient::run(std::string host, std::string port) {
 
-    // Resolve the hostname
-    tcp::resolver resolver(io);
+  // Resolve the hostname
+  tcp::resolver resolver(io);
 
-    BOOST_LOG_TRIVIAL(info) << "Trying to connect to: " << host << ":" << port; 
+  BOOST_LOG_TRIVIAL(info) << "Trying to connect to: " << host << ":" << port;
 
-    tcp::resolver::query query(host, port);
+  tcp::resolver::query query(host, port);
 
-    resolver.async_resolve(query,
-        boost::bind(&BdClient::start, this, 
-          boost::asio::placeholders::error,
-          boost::asio::placeholders::iterator));
+  resolver.async_resolve(query,
+                         boost::bind(&BdClient::start, this,
+                                     boost::asio::placeholders::error,
+                                     boost::asio::placeholders::iterator));
 
+  // Setup signal handling
+  signals.async_wait(boost::bind(&BdClient::handle_signals, this,
+                                 boost::asio::placeholders::error,
+                                 boost::asio::placeholders::signal_number));
 
-    // Setup signal handling
-    signals.async_wait(boost::bind(&BdClient::handle_signals, this, 
-          boost::asio::placeholders::error, boost::asio::placeholders::signal_number));
-
-    io.run();
+  io.run();
 }
 
-void BdClient::start(const boost::system::error_code& ec,
-    tcp::resolver::iterator endpoint_iter) {
+void BdClient::start(const boost::system::error_code &ec,
+                     tcp::resolver::iterator endpoint_iter) {
   if (ec) {
-   BOOST_LOG_TRIVIAL(error) << "Failed to resolve address of backdoor server"; 
-   throw boost::system::system_error(ec);
+    BOOST_LOG_TRIVIAL(error) << "Failed to resolve address of backdoor server";
+    throw boost::system::system_error(ec);
   }
 
   stopped_ = false;
@@ -38,28 +38,30 @@ void BdClient::start(const boost::system::error_code& ec,
 
 void BdClient::stop() {
   if (stopped_) {
-    BOOST_LOG_TRIVIAL(debug) << "Trying to stop already stopped client, ignoring";
+    BOOST_LOG_TRIVIAL(debug)
+        << "Trying to stop already stopped client, ignoring";
     return;
   }
 
   if (registered_) {
-    //we have to deregister from the server first
+    // we have to deregister from the server first
     start_deregister();
   } else {
-    //we can just close the socket
+    // we can just close the socket
     close_socket();
   }
 }
 
 void BdClient::start_connect(tcp::resolver::iterator endpoint_iter) {
-  //Start deadline timer for connection
-  
+  // Start deadline timer for connection
+
   BOOST_LOG_TRIVIAL(info) << "Connecting to remote server...";
-  async_connect(socket_, endpoint_iter, boost::bind(&BdClient::handle_connect, this, _1, _2));
+  async_connect(socket_, endpoint_iter,
+                boost::bind(&BdClient::handle_connect, this, _1, _2));
 }
 
-void BdClient::handle_connect(const boost::system::error_code& ec,
-        tcp::resolver::iterator endpoint_iter) {
+void BdClient::handle_connect(const boost::system::error_code &ec,
+                              tcp::resolver::iterator endpoint_iter) {
   BOOST_LOG_TRIVIAL(trace) << "BdClient::handle_connect";
 
   if (stopped_)
@@ -82,27 +84,26 @@ void BdClient::handle_connect(const boost::system::error_code& ec,
   start_register();
 }
 
-
 void BdClient::start_register() {
   BOOST_LOG_TRIVIAL(trace) << "BdClient::start_register";
 
   if (stopped_)
     return;
 
-  //Send the client register command
-  
+  // Send the client register command
+
   BOOST_LOG_TRIVIAL(info) << "Sending register command";
-  
+
   Json::Value reg_cmd;
 
-  reg_cmd["auth"]["token"]      = auth_token_;
-  reg_cmd["auth"]["timestamp"]  = "123";
+  reg_cmd["auth"]["token"] = auth_token_;
+  reg_cmd["auth"]["timestamp"] = "123";
 
   reg_cmd["cmd"]["method"] = "REGISTER";
   reg_cmd["cmd"]["params"] = Json::arrayValue;
 
   async_write(socket_, boost::asio::buffer(json_writer_.write(reg_cmd)),
-      boost::bind(&BdClient::handle_register, this));
+              boost::bind(&BdClient::handle_register, this));
 }
 
 void BdClient::handle_register() {
@@ -114,8 +115,8 @@ void BdClient::handle_register() {
     return;
   }
 
-  //Now are registered with the server, do useful stuff...
-  
+  // Now are registered with the server, do useful stuff...
+
   // Wait for commands from server
   start_read();
 }
@@ -123,25 +124,27 @@ void BdClient::handle_register() {
 void BdClient::start_read() {
   BOOST_LOG_TRIVIAL(debug) << "Starting to listen for server commands";
 
-  async_read_until(socket_, input_buffer_, '\n', 
-      boost::bind(&BdClient::handle_read, this, _1, _2));
+  async_read_until(socket_, input_buffer_, '\n',
+                   boost::bind(&BdClient::handle_read, this, _1, _2));
 }
 
-void BdClient::handle_read(const boost::system::error_code& ec, std::size_t bytes_transferred) {
+void BdClient::handle_read(const boost::system::error_code &ec,
+                           std::size_t bytes_transferred) {
   BOOST_LOG_TRIVIAL(trace) << "BdClient::handle_read";
-  
-  if (stopped_) 
+
+  if (stopped_)
     return;
 
   if (ec == boost::asio::error::eof) {
-    //Connection closed by remote host
+    // Connection closed by remote host
     BOOST_LOG_TRIVIAL(info) << "Connection closed by remote host";
 
-    //since we don't have a connection anymore, just close the socket immediatly
+    // since we don't have a connection anymore, just close the socket
+    // immediatly
     close_socket();
     return;
   }
-  
+
   if (ec) {
     throw boost::system::system_error(ec);
   }
@@ -153,7 +156,7 @@ void BdClient::handle_read(const boost::system::error_code& ec, std::size_t byte
   Json::Value received_json;
 
   if (json_reader_.parse(is, received_json, false)) {
-    //We received a valid command!
+    // We received a valid command!
     BOOST_LOG_TRIVIAL(debug) << "Received a valid JSON command";
     BOOST_LOG_TRIVIAL(debug) << received_json;
 
@@ -172,17 +175,18 @@ void BdClient::handle_read(const boost::system::error_code& ec, std::size_t byte
       BOOST_LOG_TRIVIAL(debug) << "Sending PONG";
 
       async_write(socket_, boost::asio::buffer(json_writer_.write(pong)),
-          boost::bind(&BdClient::handle_write, this, _1, _2));
+                  boost::bind(&BdClient::handle_write, this, _1, _2));
     }
   } else {
-    //Log wrong command
+    // Log wrong command
     BOOST_LOG_TRIVIAL(warning) << "Unable to parse received JSON";
   }
 
   start_read();
 }
 
-void BdClient::handle_write(const boost::system::error_code& ec, std::size_t bytes_transferred) {
+void BdClient::handle_write(const boost::system::error_code &ec,
+                            std::size_t bytes_transferred) {
   BOOST_LOG_TRIVIAL(trace) << "BdClient::handle_write";
 
   if (ec) {
@@ -204,12 +208,13 @@ void BdClient::start_deregister() {
   BOOST_LOG_TRIVIAL(info) << "Unregistering from server";
 
   async_write(socket_, boost::asio::buffer(json_writer_.write(deregister_cmd)),
-        boost::bind(&BdClient::handle_deregister, this, 
-          boost::asio::placeholders::error, boost::asio::placeholders::bytes_transferred));
+              boost::bind(&BdClient::handle_deregister, this,
+                          boost::asio::placeholders::error,
+                          boost::asio::placeholders::bytes_transferred));
 }
 
-void BdClient::handle_deregister(const boost::system::error_code& ec, 
-    std::size_t bytes_transferred) {
+void BdClient::handle_deregister(const boost::system::error_code &ec,
+                                 std::size_t bytes_transferred) {
   BOOST_LOG_TRIVIAL(trace) << "BdClient::handle_deregister";
 
   if (ec) {
@@ -227,7 +232,7 @@ void BdClient::close_socket() {
 
   boost::system::error_code ec;
 
-  //we can now shutdown, as we have succesfully closed the socket
+  // we can now shutdown, as we have succesfully closed the socket
   socket_.shutdown(tcp::socket::shutdown_both, ec);
 
   if (ec) {
@@ -237,11 +242,12 @@ void BdClient::close_socket() {
 
   socket_.close();
 
-  //remove signal handler
+  // remove signal handler
   signals.cancel();
 }
 
-void BdClient::handle_signals(const boost::system::error_code& error, int signal_number) {
+void BdClient::handle_signals(const boost::system::error_code &error,
+                              int signal_number) {
   BOOST_LOG_TRIVIAL(trace) << "BdClient::handle_signals";
 
   if (error == boost::asio::error::operation_aborted) {
@@ -253,13 +259,14 @@ void BdClient::handle_signals(const boost::system::error_code& error, int signal
     BOOST_LOG_TRIVIAL(error) << "Failed to handle signal";
     throw boost::system::error_code(error);
   }
- 
-  if (signal_number == 15) //SIGTERM
+
+  if (signal_number == 15) // SIGTERM
     BOOST_LOG_TRIVIAL(info) << "Received SIGTERM, shutting down";
 
-  if (signal_number == 2) //SIGINT
+  if (signal_number == 2) // SIGINT
     BOOST_LOG_TRIVIAL(info) << "Received SIGINT, shutting down";
 
-  // Stop the client, then all io operations should be finished and we can shutdown
+  // Stop the client, then all io operations should be finished and we can
+  // shutdown
   stop();
 }
