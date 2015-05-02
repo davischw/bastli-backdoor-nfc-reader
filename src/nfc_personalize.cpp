@@ -14,7 +14,7 @@ uint8_t bastli_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
 const uint32_t bastli_backdoor_aid = 0x5;
 const uint8_t bastli_key_version = 1;
 
-void personalize_card(MifareTag tag, MifareDesfireKey new_key);
+void personalize_card(MifareTag tag, MifareDesfireKey &new_key);
 void list_applications(MifareTag tag);
 void read_token(MifareTag tag);
 
@@ -196,7 +196,7 @@ int main() {
   return 0;
 };
 
-void personalize_card(MifareTag tag, MifareDesfireKey new_key) {
+void personalize_card(MifareTag tag, MifareDesfireKey &new_key) {
   auto default_key = MifareDesfireKey::create_des_key(null_key);
   int res = mifare_desfire_authenticate(tag, 0, default_key.get_raw());
 
@@ -334,6 +334,7 @@ void read_token(MifareTag tag) {
 
   auto default_key = MifareDesfireKey::create_des_key(null_key);
 
+
   MifareDESFireAID bastli_aid = mifare_desfire_aid_new(bastli_backdoor_aid);
   if (bastli_aid == nullptr) {
     BOOST_LOG_TRIVIAL(error) << "Failed to create Bastli AID";
@@ -358,8 +359,9 @@ void read_token(MifareTag tag) {
     return;
   }
 
-  uint32_t data = 0;
-  res = mifare_desfire_read_data(tag, 0, 0, sizeof(data), &data);
+  uint32_t data[3] = { 0 };
+  BOOST_LOG_TRIVIAL(trace) << "sizeof data: " << sizeof(data);
+  res = mifare_desfire_read_data(tag, 0, 0, 4, data);
   if (res < 0) {
     BOOST_LOG_TRIVIAL(warning) << "Failed to read data...";
     freefare_perror(tag, "mifare_desfire_read_data");
@@ -368,7 +370,11 @@ void read_token(MifareTag tag) {
     return;
   }
 
-  BOOST_LOG_TRIVIAL(info) << "Successfully read token from card: " << data;
+  for (int i = 0; i < 3; i++) {
+    printf("%d\n", data[i]);
+  }
+
+  BOOST_LOG_TRIVIAL(info) << "Successfully read token from card: " << data[0];
 
   free(bastli_aid);
 }

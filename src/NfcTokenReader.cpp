@@ -46,7 +46,7 @@ void NfcTokenReader::run() {
     while (_running) {
       auto tokens = poll(device);
 
-      for (auto token : tokens) {
+      for (uint32_t token : tokens) {
         BOOST_LOG_TRIVIAL(trace) << "Read token " << token;
       }
     }
@@ -70,6 +70,8 @@ std::vector<uint32_t> NfcTokenReader::poll(NfcDevice &device) {
     auto i = 0;
     for (; tags[i]; i++) {
       auto t = read_tag(tags[i]);
+
+      BOOST_LOG_TRIVIAL(trace) << "Adding token to vector";
 
       if (t != 0) {
         tokens.push_back(t);
@@ -122,8 +124,8 @@ uint32_t NfcTokenReader::read_tag(MifareTag tag) {
   res = mifare_desfire_authenticate(tag, 0, new_key.get_raw());
   if (res < 0) {
     freefare_perror(tag, "mifare_desfire_authenticate");
-    BOOST_LOG_TRIVIAL(warning) << "Card is neither using default "
-                                  "key nor bastli key, ignoring "
+    BOOST_LOG_TRIVIAL(warning) << "Card is not using "
+                                  "bastli key, ignoring "
                                   "card";
     return 0;
   }
@@ -131,6 +133,7 @@ uint32_t NfcTokenReader::read_tag(MifareTag tag) {
   const uint32_t bastli_backdoor_aid = 0x5;
 
   uint8_t null_key[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
   auto default_key = MifareDesfireKey::create_des_key(null_key);
 
   MifareDESFireAID bastli_aid = mifare_desfire_aid_new(bastli_backdoor_aid);
@@ -139,6 +142,7 @@ uint32_t NfcTokenReader::read_tag(MifareTag tag) {
     freefare_perror(tag, "mifare_desfire_aid_new");
     return 0;
   }
+
 
   res = mifare_desfire_select_application(tag, bastli_aid);
   if (res < 0) {
@@ -157,8 +161,20 @@ uint32_t NfcTokenReader::read_tag(MifareTag tag) {
     return 0;
   }
 
-  uint32_t data = 0;
-  res = mifare_desfire_read_data(tag, 0, 0, sizeof(data), &data);
+
+  // The mifare_desfire_read_data function is broken 
+  // (see https://github.com/nfc-tools/libfreefare/commit/a0ba196b498979921b9a9247771b816bbfec014f)
+  // so we have to prepare a bigger buffer than actually needed...
+  uint32_t data[3] = { 0 };
+  res = mifare_desfire_read_data(tag, 0, 0, sizeof(uint32_t), data);
+
+  if (res < 4) {
+    BOOST_LOG_TRIVIAL(warning) << "Did not read enough data!";
+  } else if (res > 4) {
+    BOOST_LOG_TRIVIAL(error) << "Did read too much data!";
+  }
+
+
   if (res < 0) {
     BOOST_LOG_TRIVIAL(warning) << "Failed to read data...";
     freefare_perror(tag, "mifare_desfire_read_data");
@@ -167,9 +183,11 @@ uint32_t NfcTokenReader::read_tag(MifareTag tag) {
     return 0;
   }
 
-  BOOST_LOG_TRIVIAL(info) << "Successfully read token from card: " << data;
+  BOOST_LOG_TRIVIAL(trace) << "Successfully read token from card: " << data[0];
 
   free(bastli_aid);
 
-  return data;
+  BOOST_LOG_TRIVIAL(trace) << "Freed bastli_aid";
+
+  return data[0];
 }
