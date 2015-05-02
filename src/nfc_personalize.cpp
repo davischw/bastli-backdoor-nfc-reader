@@ -5,6 +5,8 @@
 #include "NfcContext.hpp"
 #include "MifareDesfireKey.hpp"
 
+#include "NfcTokenReader.hpp"
+
 uint8_t null_key[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 uint8_t bastli_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
                         0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77};
@@ -17,6 +19,18 @@ void list_applications(MifareTag tag);
 void read_token(MifareTag tag);
 
 int main() {
+
+  NfcTokenReader reader;
+
+  reader.start();
+
+  std::this_thread::sleep_for(std::chrono::seconds(10));
+
+  BOOST_LOG_TRIVIAL(trace) << "Trying to stop thread...";
+
+  reader.stop();
+
+  return 0;
 
   const size_t max_devices = 8;
 
@@ -48,7 +62,7 @@ int main() {
 
     // do stuff with the device
     MifareTag *tags = nullptr;
-    tags = freefare_get_tags(device->getRawPointer());
+    tags = freefare_get_tags(device.getRawPointer());
     if (tags == nullptr) {
       BOOST_LOG_TRIVIAL(warning) << "Failed to listen tags";
     } else {

@@ -22,7 +22,7 @@ public:
   };
 
   std::vector<std::string> list_devices(size_t max_devices);
-  std::unique_ptr<NfcDevice> open(std::string connstring);
+  NfcDevice open(std::string connstring);
 
 private:
   NfcContext() {
@@ -59,6 +59,6 @@ private:
     }
   }
 
-  friend std::unique_ptr<NfcDevice> NfcContext::open(std::string connstring);
+  friend NfcDevice NfcContext::open(std::string connstring);
 };
 #endif // NFC_CONTEXT_HPP
