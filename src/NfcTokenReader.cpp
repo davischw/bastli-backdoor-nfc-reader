@@ -1,5 +1,7 @@
 #include "NfcTokenReader.hpp"
 
+#include "MifareDesfireKey.hpp"
+
 void NfcTokenReader::start() {
   if (!_running) {
     _running = true;
@@ -82,6 +84,49 @@ std::vector<uint32_t> NfcTokenReader::poll(NfcDevice &device) {
 }
 
 uint32_t NfcTokenReader::read_tag(MifareTag tag) {
-  // TODO: read token from the tag...
-  return 0;
+
+  const uint32_t bastli_backdoor_aid = 0x5;
+
+  uint8_t null_key[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+  auto default_key = MifareDesfireKey::create_des_key(null_key);
+
+  MifareDESFireAID bastli_aid = mifare_desfire_aid_new(bastli_backdoor_aid);
+  if (bastli_aid == nullptr) {
+    BOOST_LOG_TRIVIAL(error) << "Failed to create Bastli AID";
+    freefare_perror(tag, "mifare_desfire_aid_new");
+    return 0;
+  }
+
+  int res = mifare_desfire_select_application(tag, bastli_aid);
+  if (res < 0) {
+    freefare_perror(tag, "mifare_desfire_select_application");
+
+    free(bastli_aid);
+    return 0;
+  }
+
+  // authenticate with default_key
+  res = mifare_desfire_authenticate(tag, 0, default_key.get_raw());
+  if (res < 0) {
+    freefare_perror(tag, "mifare_desfire_authenticate");
+
+    free(bastli_aid);
+    return 0;
+  }
+
+  uint32_t data = 0;
+  res = mifare_desfire_read_data(tag, 0, 0, sizeof(data), &data);
+  if (res < 0) {
+    BOOST_LOG_TRIVIAL(warning) << "Failed to read data...";
+    freefare_perror(tag, "mifare_desfire_read_data");
+
+    free(bastli_aid);
+    return 0;
+  }
+
+  BOOST_LOG_TRIVIAL(info) << "Successfully read token from card: " << data;
+
+  free(bastli_aid);
+
+  return data;
 }
