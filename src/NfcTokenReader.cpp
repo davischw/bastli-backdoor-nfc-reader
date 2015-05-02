@@ -85,6 +85,49 @@ std::vector<uint32_t> NfcTokenReader::poll(NfcDevice &device) {
 
 uint32_t NfcTokenReader::read_tag(MifareTag tag) {
 
+  // verify Tag type
+
+  if (DESFIRE != freefare_get_tag_type(tag)) {
+    BOOST_LOG_TRIVIAL(debug) << "Tag is not a Desfire card";
+    return 0;
+  }
+
+  // Connect
+  int res;
+  res = mifare_desfire_connect(tag);
+  if (res < 0) {
+    BOOST_LOG_TRIVIAL(debug) << "Failed to connect to Mifare DESFire";
+    return 0;
+  }
+
+  struct mifare_desfire_version_info info;
+  res = mifare_desfire_get_version(tag, &info);
+  if (res < 0) {
+    freefare_perror(tag, "mifare_desfire_get_version");
+    return 0;
+  }
+
+  if (info.software.version_major < 1) {
+    // for some reason old software doesn't work...
+    BOOST_LOG_TRIVIAL(debug) << "Software is too old, not using card";
+    return 0;
+  }
+
+  const uint8_t bastli_key_version = 1;
+  uint8_t bastli_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
+                          0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77};
+  auto new_key = MifareDesfireKey::create_aes_key_with_version(
+      bastli_key, bastli_key_version);
+
+  res = mifare_desfire_authenticate(tag, 0, new_key.get_raw());
+  if (res < 0) {
+    freefare_perror(tag, "mifare_desfire_authenticate");
+    BOOST_LOG_TRIVIAL(warning) << "Card is neither using default "
+                                  "key nor bastli key, ignoring "
+                                  "card";
+    return 0;
+  }
+
   const uint32_t bastli_backdoor_aid = 0x5;
 
   uint8_t null_key[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -97,7 +140,7 @@ uint32_t NfcTokenReader::read_tag(MifareTag tag) {
     return 0;
   }
 
-  int res = mifare_desfire_select_application(tag, bastli_aid);
+  res = mifare_desfire_select_application(tag, bastli_aid);
   if (res < 0) {
     freefare_perror(tag, "mifare_desfire_select_application");
 
