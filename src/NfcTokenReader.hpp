@@ -4,9 +4,8 @@
 #include <vector>
 #include <thread>
 
-#include "freefare.h"
-
 #include "NfcContext.hpp"
+#include "NfcDevice.hpp"
 
 class NfcTokenReader {
 
@@ -26,10 +25,10 @@ private:
   std::thread _thread;
   bool _running = false;
 
-  NfcDevice initialize_device();
+  std::shared_ptr<NfcDevice> initialize_device();
   void run();
 
-  std::vector<uint32_t> poll(NfcDevice &device);
+  std::vector<uint32_t> poll(std::shared_ptr<NfcDevice> device);
   uint32_t read_tag(MifareTag tag);
 };
 

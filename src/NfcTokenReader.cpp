@@ -1,5 +1,5 @@
 #include "NfcTokenReader.hpp"
-
+#include "NfcTagList.hpp"
 #include "MifareDesfireKey.hpp"
 
 void NfcTokenReader::start() {
@@ -11,7 +11,7 @@ void NfcTokenReader::start() {
 
 void NfcTokenReader::stop() { _running = false; }
 
-NfcDevice NfcTokenReader::initialize_device() {
+std::shared_ptr<NfcDevice> NfcTokenReader::initialize_device() {
 
   std::shared_ptr<NfcContext> context;
 
@@ -57,19 +57,18 @@ void NfcTokenReader::run() {
   }
 }
 
-std::vector<uint32_t> NfcTokenReader::poll(NfcDevice &device) {
-  MifareTag *tags = nullptr;
-  tags = freefare_get_tags(device.getRawPointer());
+std::vector<uint32_t> NfcTokenReader::poll(std::shared_ptr<NfcDevice> device) {
+  auto tags = device->list_tags();
 
   std::vector<uint32_t> tokens;
 
-  if (tags == nullptr) {
+  if (tags.get_raw() == nullptr) {
     BOOST_LOG_TRIVIAL(warning) << "Failed to poll tags";
   } else {
 
     auto i = 0;
-    for (; tags[i]; i++) {
-      auto t = read_tag(tags[i]);
+    for (; tags.get_raw()[i]; i++) {
+      auto t = read_tag(tags.get_raw()[i]);
 
       BOOST_LOG_TRIVIAL(trace) << "Adding token to vector";
 
@@ -79,7 +78,6 @@ std::vector<uint32_t> NfcTokenReader::poll(NfcDevice &device) {
     }
 
     BOOST_LOG_TRIVIAL(info) << "Processed " << i << " tokens";
-    free(tags);
   }
 
   return tokens;
@@ -88,7 +86,6 @@ std::vector<uint32_t> NfcTokenReader::poll(NfcDevice &device) {
 uint32_t NfcTokenReader::read_tag(MifareTag tag) {
 
   // verify Tag type
-
   if (DESFIRE != freefare_get_tag_type(tag)) {
     BOOST_LOG_TRIVIAL(debug) << "Tag is not a Desfire card";
     return 0;
@@ -143,7 +140,6 @@ uint32_t NfcTokenReader::read_tag(MifareTag tag) {
     return 0;
   }
 
-
   res = mifare_desfire_select_application(tag, bastli_aid);
   if (res < 0) {
     freefare_perror(tag, "mifare_desfire_select_application");
@@ -161,11 +157,11 @@ uint32_t NfcTokenReader::read_tag(MifareTag tag) {
     return 0;
   }
 
-
-  // The mifare_desfire_read_data function is broken 
-  // (see https://github.com/nfc-tools/libfreefare/commit/a0ba196b498979921b9a9247771b816bbfec014f)
+  // The mifare_desfire_read_data function is broken
+  // (see
+  // https://github.com/nfc-tools/libfreefare/commit/a0ba196b498979921b9a9247771b816bbfec014f)
   // so we have to prepare a bigger buffer than actually needed...
-  uint32_t data[3] = { 0 };
+  uint32_t data[3] = {0};
   res = mifare_desfire_read_data(tag, 0, 0, sizeof(uint32_t), data);
 
   if (res < 4) {
@@ -173,7 +169,6 @@ uint32_t NfcTokenReader::read_tag(MifareTag tag) {
   } else if (res > 4) {
     BOOST_LOG_TRIVIAL(error) << "Did read too much data!";
   }
-
 
   if (res < 0) {
     BOOST_LOG_TRIVIAL(warning) << "Failed to read data...";

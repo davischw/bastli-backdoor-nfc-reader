@@ -23,22 +23,28 @@ add_subdirectory(dist/)
 # Use dynamically linked boost
 add_definitions(-DBOOST_ALL_DYN_LINK)
 
-# Create main executable
-add_executable(nfc-reader src/nfc-reader.cpp src/bd_client.cpp)
+# Create server test client
+add_executable(nfc-test-client src/nfc_test_client.cpp src/bd_client.cpp)
 
 # Create test executable for nfc personalisation
-add_executable(nfc-personalize src/nfc_personalize.cpp src/NfcContext.cpp src/NfcTokenReader.cpp)
+add_executable(nfc-personalize src/nfc_personalize.cpp src/NfcContext.cpp src/NfcDevice.cpp)
+
+add_executable(nfc-reader src/nfc_reader.cpp src/NfcTokenReader.cpp src/NfcContext.cpp src/NfcDevice.cpp)
+
+add_executable(nfc-reset src/nfc_reset.cpp src/NfcContext.cpp)
 
 include_directories(${jsoncpp_INCLUDE_DIR})
-target_link_libraries(nfc-reader jsoncpp)
+target_link_libraries(nfc-test-client jsoncpp)
 
 # Look for Boost libraries
 find_package(Boost REQUIRED COMPONENTS system filesystem date_time thread log program_options regex)
 
 if (Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
-  target_link_libraries(nfc-reader ${Boost_LIBRARIES})
+  target_link_libraries(nfc-test-client ${Boost_LIBRARIES})
   target_link_libraries(nfc-personalize ${Boost_LIBRARIES})
+  target_link_libraries(nfc-reader ${Boost_LIBRARIES})
+  target_link_libraries(nfc-reset ${Boost_LIBRARIES})
 endif (Boost_FOUND)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/modules)
@@ -52,10 +58,12 @@ if (CMAKE_VERSION GREATER 3)
 
   find_package(Threads REQUIRED)
   if (CMAKE_USE_PTHREADS_INIT)
-    target_link_libraries(nfc-reader Threads::Threads)
+    target_link_libraries(nfc-test-client Threads::Threads)
     target_link_libraries(nfc-personalize Threads::Threads)
+    target_link_libraries(nfc-reader Threads::Threads)
+    target_link_libraries(nfc-reset Threads::Threads)
   else()
-	message(FATAL_ERROR "PThread not found, exiting")
+	  message(FATAL_ERROR "PThread not found, exiting")
   endif()
 endif()
 
@@ -64,11 +72,15 @@ find_package(libnfc REQUIRED)
 
 include_directories(${LIBNFC_INCLUDE_DIR})
 target_link_libraries(nfc-personalize ${LIBNFC_LIBRARY})
+target_link_libraries(nfc-reader ${LIBNFC_LIBRARY})
+target_link_libraries(nfc-reset ${LIBNFC_LIBRARY})
 
 # Look for libfreefare
 find_package(libfreefare REQUIRED)
 
 include_directories(${LIBFREEFARE_INCLUDE_DIR})
 target_link_libraries(nfc-personalize ${LIBFREEFARE_LIBRARY})
+target_link_libraries(nfc-reader ${LIBFREEFARE_LIBRARY})
+target_link_libraries(nfc-reset ${LIBFREEFARE_LIBRARY})
 
 include_directories(src/)
