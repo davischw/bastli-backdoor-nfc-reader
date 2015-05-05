@@ -12,6 +12,9 @@ class NfcDevice;
 class NfcContext : public std::enable_shared_from_this<NfcContext> {
 
 public:
+  NfcContext(const NfcContext& that) = delete;
+  NfcContext& operator=(const NfcContext& that) = delete;
+
   static std::shared_ptr<NfcContext> init();
 
   ~NfcContext() {

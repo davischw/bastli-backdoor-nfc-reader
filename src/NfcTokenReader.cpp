@@ -42,6 +42,7 @@ void NfcTokenReader::run() {
     auto device = initialize_device();
 
     // continuosly poll for an NFC Tag
+    BOOST_LOG_TRIVIAL(info) << "Connection to device established";
 
     while (_running) {
       auto tokens = poll(device);
@@ -84,6 +85,7 @@ std::vector<uint32_t> NfcTokenReader::poll(std::shared_ptr<NfcDevice> device) {
 }
 
 uint32_t NfcTokenReader::read_tag(MifareTag tag) {
+  BOOST_LOG_TRIVIAL(trace) << "Reading tag";
 
   // verify Tag type
   if (DESFIRE != freefare_get_tag_type(tag)) {
