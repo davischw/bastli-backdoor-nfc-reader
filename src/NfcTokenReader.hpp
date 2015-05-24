@@ -6,17 +6,13 @@
 
 #include "NfcContext.hpp"
 #include "NfcDevice.hpp"
+#include "locked_queue.h"
 
 class NfcTokenReader {
 
 public:
-  NfcTokenReader(){};
-
-  ~NfcTokenReader() {
-    if (_thread.joinable()) {
-      _thread.join();
-    }
-  }
+  NfcTokenReader(LockedQueue<std::string>* queue);
+  ~NfcTokenReader();
 
   void start();
   void stop();
@@ -24,6 +20,7 @@ public:
 private:
   std::thread _thread;
   bool _running = false;
+  LockedQueue<std::string>* _queue;
 
   std::shared_ptr<NfcDevice> initialize_device();
   void run();

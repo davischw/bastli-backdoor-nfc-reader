@@ -29,7 +29,7 @@ add_executable(nfc-test-client src/nfc_test_client.cpp src/bd_client.cpp)
 # Create test executable for nfc personalisation
 add_executable(nfc-personalize src/nfc_personalize.cpp src/NfcContext.cpp src/NfcDevice.cpp)
 
-add_executable(nfc-reader src/nfc_reader.cpp src/NfcTokenReader.cpp src/NfcContext.cpp src/NfcDevice.cpp)
+add_executable(nfc-reader src/nfc_reader.cpp src/NfcTokenReader.cpp src/NfcContext.cpp src/NfcDevice.cpp src/opener.cpp)
 
 add_executable(nfc-reset src/nfc_reset.cpp src/NfcContext.cpp)
 
@@ -66,6 +66,12 @@ if (CMAKE_VERSION GREATER 3)
 	  message(FATAL_ERROR "PThread not found, exiting")
   endif()
 endif()
+
+# Look for wiringPi
+find_package(wiringPi REQUIRED)
+
+include_directories(${WIRINGPI_INCLUDE_DIR})
+target_link_libraries(nfc-reader ${WIRINGPI_LIBRARY})
 
 # Look for libnfc
 find_package(libnfc REQUIRED)

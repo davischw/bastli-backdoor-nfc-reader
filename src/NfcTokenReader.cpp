@@ -2,6 +2,14 @@
 #include "NfcTagList.hpp"
 #include "MifareDesfireKey.hpp"
 
+NfcTokenReader::NfcTokenReader(LockedQueue<std::string>* queue) : _queue(queue) {};
+
+NfcTokenReader::~NfcTokenReader() {
+    if (_thread.joinable()) {
+      _thread.join();
+    }
+}
+
 void NfcTokenReader::start() {
   if (!_running) {
     _running = true;
