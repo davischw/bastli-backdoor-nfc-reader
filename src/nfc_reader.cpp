@@ -1,8 +1,10 @@
 // Boost Logging
 #include <boost/log/trivial.hpp>
 
+#include "json.h"
 #include "NfcTokenReader.hpp"
 #include "opener.h"
+#include "token.h"
 
 int main() {
 
@@ -10,10 +12,13 @@ int main() {
 
   config_struct config;
   config.use_logger = false;
+  config.cache_token_timeout = 600;
 
-  LockedQueue<std::string> token_read;
+  LockedQueue<Token> token_read;
+  LockedQueue<Json::Value> server_in;
+  LockedQueue<Json::Value> server_out;
 
-  Opener o(config, 600, &token_read);
+  Opener o(config, &token_read, &server_in, &server_out);
   NfcTokenReader reader(&token_read);
 
   o.start();

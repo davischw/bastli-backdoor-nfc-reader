@@ -5,6 +5,7 @@
 #include "NfcContext.hpp"
 #include "NfcDevice.hpp"
 #include "NfcTagList.hpp"
+#include "token.h"
 
 #include "MifareDesfireKey.hpp"
 
@@ -305,9 +306,9 @@ void personalize_card(MifareTag tag, MifareDesfireKey &new_key) {
     return;
   }
 
-  uint32_t token = 0xdeadbeef;
+  Token token("deadbeef");
 
-  res = mifare_desfire_write_data(tag, 0, 0, sizeof(token), &token);
+  res = mifare_desfire_write_data(tag, 0, 0, sizeof(token), token.data());
   if (res != sizeof(token)) {
     BOOST_LOG_TRIVIAL(warning) << "Failed to write all data!";
     return;

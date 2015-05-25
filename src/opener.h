@@ -14,10 +14,12 @@
 #include "cache_entry.h"
 #include <vector>
 #include "json.h"
+#include "token.h"
 
 class Opener{
 public:
-	Opener(config_struct c, int cache_timeout, LockedQueue<std::string>* in);
+	Opener(config_struct c, LockedQueue<Token>* queue_reader,
+		LockedQueue<Json::Value>* queue_server_in, LockedQueue<Json::Value>* queue_server_out);
     ~Opener();
 
 	config_struct config;
@@ -36,7 +38,10 @@ private:
 	struct termios t_config;
 	std::vector<cache_entry> token_cache;
 	int cache_timeout;
-	LockedQueue<std::string>* queue_in;
+	LockedQueue<Token>* queue_reader;
+	LockedQueue<Json::Value>* queue_server_in;
+	LockedQueue<Json::Value>* queue_server_out;
+	std::vector<std::pair<Token, int>> tokens_waiting;
 	
 	void run();
 };

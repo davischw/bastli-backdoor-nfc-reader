@@ -3,15 +3,17 @@
 
 #include <vector>
 #include <thread>
+#include <boost/optional.hpp>
 
 #include "NfcContext.hpp"
 #include "NfcDevice.hpp"
 #include "locked_queue.h"
+#include "token.h"
 
 class NfcTokenReader {
 
 public:
-  NfcTokenReader(LockedQueue<std::string>* queue);
+  NfcTokenReader(LockedQueue<Token>* queue);
   ~NfcTokenReader();
 
   void start();
@@ -20,13 +22,13 @@ public:
 private:
   std::thread _thread;
   bool _running = false;
-  LockedQueue<std::string>* _queue;
+  LockedQueue<Token>* _queue;
 
   std::shared_ptr<NfcDevice> initialize_device();
   void run();
 
-  std::vector<uint32_t> poll(std::shared_ptr<NfcDevice> device);
-  uint32_t read_tag(MifareTag tag);
+  std::vector<Token> poll(std::shared_ptr<NfcDevice> device);
+  boost::optional<Token> read_tag(MifareTag tag);
 };
 
 #endif // NFC_TOKEN_READER_HPP

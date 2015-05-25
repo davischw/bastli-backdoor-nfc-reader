@@ -27,14 +27,15 @@ add_definitions(-DBOOST_ALL_DYN_LINK)
 add_executable(nfc-test-client src/nfc_test_client.cpp src/bd_client.cpp)
 
 # Create test executable for nfc personalisation
-add_executable(nfc-personalize src/nfc_personalize.cpp src/NfcContext.cpp src/NfcDevice.cpp)
+add_executable(nfc-personalize src/nfc_personalize.cpp src/NfcContext.cpp src/NfcDevice.cpp src/token.cpp)
 
-add_executable(nfc-reader src/nfc_reader.cpp src/NfcTokenReader.cpp src/NfcContext.cpp src/NfcDevice.cpp src/opener.cpp)
+add_executable(nfc-reader src/nfc_reader.cpp src/NfcTokenReader.cpp src/NfcContext.cpp src/NfcDevice.cpp src/opener.cpp src/token.cpp src/command.cpp)
 
 add_executable(nfc-reset src/nfc_reset.cpp src/NfcContext.cpp)
 
 include_directories(${jsoncpp_INCLUDE_DIR})
 target_link_libraries(nfc-test-client jsoncpp)
+target_link_libraries(nfc-reader jsoncpp)
 
 # Look for Boost libraries
 find_package(Boost REQUIRED COMPONENTS system filesystem date_time thread log program_options regex)

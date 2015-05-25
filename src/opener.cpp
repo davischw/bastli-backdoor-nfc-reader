@@ -1,10 +1,14 @@
 #include "opener.h"
+#include "command.h"
 
-Opener::Opener(config_struct c, int cache_timeout, LockedQueue<std::string>* in):
+Opener::Opener(config_struct c, LockedQueue<Token>* queue_reader,
+	LockedQueue<Json::Value>* queue_server_in, LockedQueue<Json::Value>* queue_server_out):
 	config(c),
-	running(false){
-
-	queue_in = in;
+	running(false),
+	queue_reader(queue_reader),
+	queue_server_in(queue_server_in),
+	queue_server_out(queue_server_out)
+	{
 
 	if(c.use_logger == true){
 		logger = open("/dev/ttyUSB0", O_RDWR);
@@ -45,36 +49,79 @@ Opener::~Opener() {
 }
 
 void Opener::run(){
-        printf("Run()\n");
+    printf("Run()\n");
 
 	while(running){
-		if(queue_in->size() > 0){
-			std::string token = queue_in->pop();
-			/* try ask server for permission */
-			/* no answer form server */
-			for (auto entry : token_cache)
-			{
-				if (entry.token == token)
-				{
-					if(entry.timestamp < std::time(nullptr) - config.cache_token_timeout){
-						/* Play Sound */
+		if(queue_reader->size() > 0){
+			printf("Got Job!");
+			auto token = queue_reader->pop();
+			queue_server_out->push(Command::access(config.opener_token, token));
+		}
+		else if(queue_server_in->size() > 0){
+			/* new stuff from server */
+			Json::Value request = queue_server_in->pop();
+
+			if(request["cmd"] == "GRANT"){
+				/* ask server for user info */
+				cache_entry entry;
+				entry.token = Token(request["params"][0].asString());
+				entry.timestamp = std::time(nullptr);
+				entry.sound_path = "";
+				entry.name = "";
+				token_cache.push_back(entry);
+				for(size_t i = 0; i < tokens_waiting.size(); i++){
+					if (tokens_waiting[i].first == Token(request["params"][0].asString()))
+					{
+						tokens_waiting.erase(tokens_waiting.begin() + i);
+					}
+				}
+				/* Display Text */
+				/* Play Sound */
+			}
+			else if(request["cmd"] == "DENY"){
+				for(size_t i = 0; i < tokens_waiting.size(); i++){
+					if (tokens_waiting[i].first == Token(request["params"][0].asString()))
+					{
+						tokens_waiting.erase(tokens_waiting.begin() + i);
+					}
+				}
+				for (size_t i = 0; i < token_cache.size(); i++){
+					if (token_cache[i].token == Token(request["params"][0].asString())){
+						/* remove token from cache */
+						token_cache.erase(token_cache.begin() + i);
 					}
 				}
 			}
-			/* server answers */
-			/* Ask server for permission */
-			/* If yes */
-				/* Store token to cache */
-				/* Ask server for user data */
-				/* Play Sound */
-			/* if no search chache and delete token if found */
+			else if(request["cmd"] == "OPEN"){
+				open_to("Opened by server request.");
+				/* Display Standard Text */
+				/* Play Standard Sound */
+			}
 		}
 		else{
-			/* purge cache in sparetime */
+			/* No stuff to do, check for timeout on server and check cache */
+			for(size_t j = 0; j < tokens_waiting.size(); j++){
+				if(tokens_waiting[j].second < config.server_timeout){
+					for (size_t i = 0; i < token_cache.size(); i++){
+						if (token_cache[i].token == tokens_waiting[j].first){
+							if(token_cache[i].timestamp < std::time(nullptr) - config.cache_token_timeout){
+								open_to("Opened by server request.");
+								/* Play Sound */
+							}
+							else{
+								/* remove token from cache */
+								token_cache.erase(token_cache.begin() + i);
+							}
+							break;
+						}
+					}
+					tokens_waiting.erase(tokens_waiting.begin() + j);
+					break;
+				}
+			}
 		}
 	}
-
-        printf("Finished running\n");
+    printf("Finished running\n");
 }
 
 void Opener::start(){
