@@ -1,9 +1,18 @@
+#ifndef CONFIG_STRUCT_H
+#define CONFIG_STRUCT_H
+
 #include "token.h"
 
-struct config_struct{
+struct ConfigStruct{
 	bool use_logger;
+
 	int cache_token_timeout;
 	int server_timeout;
-	Token opener_token;
-	Token server_token;
+
+	std::string hostname;
+	std::string port; //socket library requires port as a string
+
+	Token	      server_token;
+	Token       client_token;
 };
+#endif //CONFIG_STRUCT_H

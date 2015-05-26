@@ -2,12 +2,18 @@
 // Boost Logging
 #include <boost/log/trivial.hpp>
 
+#include <boost/program_options.hpp>
+
+#include <iostream>
+
 #include "NfcContext.hpp"
 #include "NfcDevice.hpp"
 #include "NfcTagList.hpp"
 #include "token.h"
 
 #include "MifareDesfireKey.hpp"
+
+namespace po = boost::program_options;
 
 uint8_t null_key[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 uint8_t bastli_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
@@ -16,11 +22,35 @@ uint8_t bastli_key[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
 const uint32_t bastli_backdoor_aid = 0x5;
 const uint8_t bastli_key_version = 1;
 
-void personalize_card(MifareTag tag, MifareDesfireKey &new_key);
+void personalize_card(MifareTag tag, MifareDesfireKey &new_key, Token card_token);
 void list_applications(MifareTag tag);
 void read_token(MifareTag tag);
 
-int main() {
+int main(int argc, char** argv) {
+  po::options_description cmd("Generic options");
+  cmd.add_options()(
+      "help", "show help message")(
+       "token", po::value<std::string>(), "card token");
+
+  po::variables_map vm;
+  po::store(po::parse_command_line(argc, argv, cmd), vm);
+  po::notify(vm);
+
+  if (vm.count("help") || !(vm.count("token"))) {
+    std::cout << cmd << std::endl;
+    return 1;
+  }
+
+  BOOST_LOG_TRIVIAL(info) << "NFC-Personalizer v0.0.1";
+
+  std::string token_s = vm["token"].as<std::string>();
+
+
+  BOOST_LOG_TRIVIAL(trace) << "Token: " << token_s;
+
+  Token card_token(vm["token"].as<std::string>());
+
+  BOOST_LOG_TRIVIAL(trace) << "Token created..";
 
   const size_t max_devices = 8;
 
@@ -107,7 +137,7 @@ int main() {
             // key version 0 is used for default key
             // try to personalize card
 
-            personalize_card(tags.get_raw()[i], new_key);
+            personalize_card(tags.get_raw()[i], new_key, card_token);
           } else {
             if (version == bastli_key_version) {
 
@@ -189,7 +219,7 @@ int main() {
   return 0;
 };
 
-void personalize_card(MifareTag tag, MifareDesfireKey &new_key) {
+void personalize_card(MifareTag tag, MifareDesfireKey &new_key, Token card_token) {
   auto default_key = MifareDesfireKey::create_des_key(null_key);
   int res = mifare_desfire_authenticate(tag, 0, default_key.get_raw());
 
@@ -306,10 +336,8 @@ void personalize_card(MifareTag tag, MifareDesfireKey &new_key) {
     return;
   }
 
-  Token token("deadbeef");
-
-  res = mifare_desfire_write_data(tag, 0, 0, sizeof(token), token.data());
-  if (res != sizeof(token)) {
+  res = mifare_desfire_write_data(tag, 0, 0, sizeof(card_token), card_token.data());
+  if (res != sizeof(card_token)) {
     BOOST_LOG_TRIVIAL(warning) << "Failed to write all data!";
     return;
   }

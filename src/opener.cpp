@@ -1,13 +1,13 @@
 #include "opener.h"
 #include "command.h"
 
-Opener::Opener(config_struct c, LockedQueue<Token>* queue_reader,
-	LockedQueue<Json::Value>* queue_server_in, LockedQueue<Json::Value>* queue_server_out):
+Opener::Opener(ConfigStruct c, LockedQueue<Token>* queue_reader,
+	LockedQueue<Json::Value>* queue_server_in, BdClient& client):
 	config(c),
 	running(false),
 	queue_reader(queue_reader),
 	queue_server_in(queue_server_in),
-	queue_server_out(queue_server_out)
+        client(client)
 	{
 
 	if(c.use_logger == true){
@@ -52,22 +52,29 @@ void Opener::run(){
     printf("Run()\n");
 
 	while(running){
+
 		if(queue_reader->size() > 0){
-			printf("Got Job!");
+			printf("Got Job (queue_size: %i)!\n", queue_reader->size());
 			auto token = queue_reader->pop();
-			queue_server_out->push(Command::access(config.opener_token, token));
+			client.send(Command::access(config.client_token, token));
+                        printf("Sent msg to bd_client (queue_size: %i)\n", queue_reader->size());
 		}
-		else if(queue_server_in->size() > 0){
+
+		if(queue_server_in->size() > 0){
 			/* new stuff from server */
 			Json::Value request = queue_server_in->pop();
+                        printf("New msg from server\n");
 
-			if(request["cmd"] == "GRANT"){
+			if(request["cmd"]["method"] == "GRANT"){
 				/* ask server for user info */
+                                printf("Granting access...\n");
 				cache_entry entry;
-				entry.token = Token(request["params"][0].asString());
+				entry.token = Token(request["cmd"]["params"][0].asString());
 				entry.timestamp = std::time(nullptr);
 				entry.sound_path = "";
 				entry.name = "";
+                                printf("Cache entry created\n");
+
 				token_cache.push_back(entry);
 				for(size_t i = 0; i < tokens_waiting.size(); i++){
 					if (tokens_waiting[i].first == Token(request["params"][0].asString()))
@@ -77,8 +84,10 @@ void Opener::run(){
 				}
 				/* Display Text */
 				/* Play Sound */
+                                open_to("GRANT");
+                                printf("Access granted!\n");
 			}
-			else if(request["cmd"] == "DENY"){
+			else if(request["cmd"]["method"] == "DENY"){
 				for(size_t i = 0; i < tokens_waiting.size(); i++){
 					if (tokens_waiting[i].first == Token(request["params"][0].asString()))
 					{
@@ -92,13 +101,13 @@ void Opener::run(){
 					}
 				}
 			}
-			else if(request["cmd"] == "OPEN"){
+			else if(request["cmd"]["method"] == "OPEN"){
 				open_to("Opened by server request.");
 				/* Display Standard Text */
 				/* Play Standard Sound */
 			}
 		}
-		else{
+		//else{
 			/* No stuff to do, check for timeout on server and check cache */
 			for(size_t j = 0; j < tokens_waiting.size(); j++){
 				if(tokens_waiting[j].second < config.server_timeout){
@@ -119,7 +128,7 @@ void Opener::run(){
 					break;
 				}
 			}
-		}
+		//}
 	}
     printf("Finished running\n");
 }

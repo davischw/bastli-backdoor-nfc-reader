@@ -49,18 +49,32 @@ int main(int argc, char *argv[]) {
   }
 
   std::string host = vm["host"].as<std::string>();
-  std::string port = vm["port"].as<std::string>();
+  auto port = vm["port"].as<std::string>();
   std::string token = vm["token"].as<std::string>();
 
-  BdClient client(token);
+  LockedQueue<Json::Value> reader_out;
+  LockedQueue<Json::Value> reader_in;
+
+  ConfigStruct config;
+
+  config.hostname = host;
+  config.port = port;
+  config.client_token = Token(token);
+
+  BdClient client(config, &reader_in, &reader_out);
 
   try {
     BOOST_LOG_TRIVIAL(info) << "Bastli NFC-Reader v0.0.1 starting";
 
-    client.run(host, port);
+    client.start();
   } catch (std::exception &e) {
     BOOST_LOG_TRIVIAL(error) << e.what();
   }
+
+  
+  std::this_thread::sleep_for(std::chrono::seconds(10));
+
+  client.stop();
 
   BOOST_LOG_TRIVIAL(info) << "Program finished, shutting down";
 

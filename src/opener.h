@@ -15,14 +15,15 @@
 #include <vector>
 #include "json.h"
 #include "token.h"
+#include "bd_client.hpp"
 
 class Opener{
 public:
-	Opener(config_struct c, LockedQueue<Token>* queue_reader,
-		LockedQueue<Json::Value>* queue_server_in, LockedQueue<Json::Value>* queue_server_out);
+	Opener(ConfigStruct c, LockedQueue<Token>* queue_reader,
+		LockedQueue<Json::Value>* queue_server_in, BdClient& client);
     ~Opener();
 
-	config_struct config;
+	ConfigStruct config;
 	
 	void start();
 	void stop();
@@ -40,7 +41,7 @@ private:
 	int cache_timeout;
 	LockedQueue<Token>* queue_reader;
 	LockedQueue<Json::Value>* queue_server_in;
-	LockedQueue<Json::Value>* queue_server_out;
+        BdClient& client;
 	std::vector<std::pair<Token, int>> tokens_waiting;
 	
 	void run();

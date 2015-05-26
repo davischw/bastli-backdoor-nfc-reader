@@ -9,7 +9,7 @@ Json::Value registr(Token auth_token){
     return query;
 }
 
-Json::Value _unregister(Token auth_token){
+Json::Value unregister(Token auth_token){
     Json::Value query;
     query["auth"]["token"] = auth_token.to_string();
     query["cmd"]["method"] = "UNREGISTER";
@@ -29,6 +29,7 @@ Json::Value deactivated_device(Token auth_token, Token token){
     Json::Value query;
     query["auth"]["token"] = auth_token.to_string();
     query["cmd"]["method"] = "DEACTIVATED";
+    query["cmd"]["service"] = "lock";
     query["cmd"]["params"] = Json::arrayValue;
     query["cmd"]["params"].append(token.to_string());
     return query;
@@ -38,6 +39,7 @@ Json::Value access(Token auth_token, Token token){
     Json::Value query;
     query["auth"]["token"] = auth_token.to_string();
     query["cmd"]["method"] = "ACCESS";
+    query["cmd"]["service"] = "basics";
     query["cmd"]["params"] = Json::arrayValue;
     query["cmd"]["params"].append(token.to_string());
     return query;
@@ -61,6 +63,7 @@ Json::Value flashed(Token auth_token, Token token){
     Json::Value query;
     query["auth"]["token"] = auth_token.to_string();
     query["cmd"]["method"] = "FLASHED";
+    query["cmd"]["service"] = "flashing";
     query["cmd"]["params"] = Json::arrayValue;
     query["cmd"]["params"].append(token.to_string());
     return query;

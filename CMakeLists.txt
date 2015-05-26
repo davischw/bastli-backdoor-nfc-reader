@@ -24,12 +24,12 @@ add_subdirectory(dist/)
 add_definitions(-DBOOST_ALL_DYN_LINK)
 
 # Create server test client
-add_executable(nfc-test-client src/nfc_test_client.cpp src/bd_client.cpp)
+add_executable(nfc-test-client src/nfc_test_client.cpp src/bd_client.cpp src/token.cpp src/command.cpp)
 
 # Create test executable for nfc personalisation
 add_executable(nfc-personalize src/nfc_personalize.cpp src/NfcContext.cpp src/NfcDevice.cpp src/token.cpp)
 
-add_executable(nfc-reader src/nfc_reader.cpp src/NfcTokenReader.cpp src/NfcContext.cpp src/NfcDevice.cpp src/opener.cpp src/token.cpp src/command.cpp)
+add_executable(nfc-reader src/nfc_reader.cpp src/NfcTokenReader.cpp src/NfcContext.cpp src/NfcDevice.cpp src/opener.cpp src/token.cpp src/command.cpp src/bd_client.cpp)
 
 add_executable(nfc-reset src/nfc_reset.cpp src/NfcContext.cpp)
 
