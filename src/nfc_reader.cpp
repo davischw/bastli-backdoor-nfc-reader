@@ -4,6 +4,8 @@
 // Boost Program Options
 #include <boost/program_options.hpp>
 
+#include "signal.h"
+
 #include "json.h"
 #include "NfcTokenReader.hpp"
 #include "opener.h"
@@ -11,6 +13,8 @@
 #include "bd_client.hpp"
 
 namespace po = boost::program_options;
+
+
 
 int main(int argc, char** argv) {
   po::options_description generic("Generic options");
@@ -41,6 +45,8 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+
+
   BOOST_LOG_TRIVIAL(info) << "Starting NFC-Reader";
 
   ConfigStruct config;
@@ -64,7 +70,33 @@ int main(int argc, char** argv) {
   reader.start();
   client.start();
 
-  std::this_thread::sleep_for(std::chrono::seconds(60));
+
+  // Setup signal handling
+  sigset_t mask;
+  sigemptyset(&mask);
+  sigaddset(&mask, SIGCHLD);
+  sigaddset(&mask, SIGINT);
+  sigaddset(&mask, SIGTERM);
+
+  //wait for signal
+  int signal;
+  int res = sigwait(&mask, &signal);
+  
+  if (res > 0) {
+    //error in signal handler
+    BOOST_LOG_TRIVIAL(fatal) << "Failure in signal handling";
+    return 1;
+  }
+
+  switch (signal) {
+  case SIGCHLD:
+    //One of the threads stopped...
+    BOOST_LOG_TRIVIAL(fatal) << "Thread shut down, trying to stop other threads and shutting down";
+    break;
+  case SIGINT:
+  case SIGTERM:
+    BOOST_LOG_TRIVIAL(info) << "Received shutdown signal";
+  }
 
   BOOST_LOG_TRIVIAL(trace) << "Trying to stop thread...";
 

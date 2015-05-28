@@ -1,6 +1,8 @@
 #include "opener.h"
 #include "command.h"
 
+#include <boost/format.hpp>
+
 Opener::Opener(ConfigStruct c, LockedQueue<Token>* queue_reader,
 	LockedQueue<Json::Value>* queue_server_in, BdClient& client):
 	config(c),
@@ -34,13 +36,16 @@ Opener::Opener(ConfigStruct c, LockedQueue<Token>* queue_reader,
 
 }
 
-	if (wiringPiSetup() == -1){
+	if (wiringPiSetupSys() == -1){
 		printf("Configuration of wiringPi failed.\n");
 		exit(1);
 	}
 
-	printf("Setting pin 29 as output\n");
-	pinMode(29, OUTPUT);
+        // Use the gpio command to export the pin
+        // This allows non-root operation
+	printf("Setting pin %i as output\n", DOOR_PIN);
+        system((boost::format("gpio export %i out") % DOOR_PIN).str().c_str());
+	pinMode(DOOR_PIN, OUTPUT);
 }
 
 Opener::~Opener() {
@@ -85,6 +90,7 @@ void Opener::run(){
 				/* Display Text */
 				/* Play Sound */
                                 open_to("GRANT");
+                                play_sound("");
                                 printf("Access granted!\n");
 			}
 			else if(request["cmd"]["method"] == "DENY"){
@@ -170,13 +176,17 @@ int Opener::display_text(std::string text){
 }
 
 int Opener::play_sound(std::string sound_path){
+	system("sudo aplay /home/bastli/backdoor-nfc-reader/bin/mario_coin.wav");
+	system("sudo aplay /home/bastli/backdoor-nfc-reader/bin/mario_coin.wav");
+	system("sudo aplay /home/bastli/backdoor-nfc-reader/bin/mario_coin.wav");
+	system("sudo aplay /home/bastli/backdoor-nfc-reader/bin/mario_1up.wav");
 	return 1;
 }
 
 void Opener::open_to(std::string user){
 	printf("Open!\n");
-	digitalWrite(29, HIGH);
+	digitalWrite(DOOR_PIN, HIGH);
 	sleep(1);
-	digitalWrite(29, LOW);
+	digitalWrite(DOOR_PIN, LOW);
 	printf("Opened!\n");
 }

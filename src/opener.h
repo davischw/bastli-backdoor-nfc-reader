@@ -43,6 +43,8 @@ private:
 	LockedQueue<Json::Value>* queue_server_in;
         BdClient& client;
 	std::vector<std::pair<Token, int>> tokens_waiting;
+
+        const int DOOR_PIN = 21; //BCM pin number, necessary for non-root access
 	
 	void run();
 };

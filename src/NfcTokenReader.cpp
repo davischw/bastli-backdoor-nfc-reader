@@ -2,6 +2,8 @@
 #include "NfcTagList.hpp"
 #include "MifareDesfireKey.hpp"
 
+#include <chrono>
+
 NfcTokenReader::NfcTokenReader(LockedQueue<Token>* queue) : _queue(queue) {};
 
 NfcTokenReader::~NfcTokenReader() {
@@ -53,7 +55,11 @@ void NfcTokenReader::run() {
     BOOST_LOG_TRIVIAL(info) << "Connection to device established";
 
     while (_running) {
+      auto start = std::chrono::system_clock::now();
       auto tokens = poll(device);
+      auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start);
+
+      BOOST_LOG_TRIVIAL(debug) << "Got token in " << duration.count() << "ms";
 
       for (auto token : tokens) {
         // add print support for token...
@@ -198,7 +204,6 @@ boost::optional<Token> NfcTokenReader::read_tag(MifareTag tag) {
 
   std::copy(buffer.begin(), buffer.begin() + token.size(), token.begin());
 
-  // TODO: Debug-Code an Token anpassen
   BOOST_LOG_TRIVIAL(trace) << "Successfully read token from card: " << token.to_string();
 
   free(bastli_aid);
