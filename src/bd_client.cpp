@@ -11,16 +11,10 @@ BdClient::~BdClient() {
 void BdClient::start() {
 
   // Resolve the hostname
-  tcp::resolver resolver(io);
-
   BOOST_LOG_TRIVIAL(info) << "Trying to connect to: " << hostname_ << ":" << port_;
 
-  tcp::resolver::query query(hostname_, port_);
 
-  resolver.async_resolve(query,
-                         boost::bind(&BdClient::start_client, this,
-                                     boost::asio::placeholders::error,
-                                     boost::asio::placeholders::iterator));
+  start_resolve();
 
   // Setup signal handling
   //signals.async_wait(boost::bind(&BdClient::handle_signals, this,
@@ -36,16 +30,27 @@ void BdClient::send(Json::Value cmd) {
   
 }
 
+void BdClient::start_resolve() {
+  tcp::resolver::query query(hostname_, port_);
+  resolver_.async_resolve(query,
+                         boost::bind(&BdClient::start_client, this,
+                                     boost::asio::placeholders::error,
+                                     boost::asio::placeholders::iterator));
+}
+
 void BdClient::start_client(const boost::system::error_code &ec,
                      tcp::resolver::iterator endpoint_iter) {
   if (ec) {
-    BOOST_LOG_TRIVIAL(error) << "Failed to resolve address of backdoor server";
-    throw boost::system::system_error(ec);
+    BOOST_LOG_TRIVIAL(error) << "Failed to resolve address of backdoor server: " << ec.message();
+    BOOST_LOG_TRIVIAL(error) << "Trying again in 10 seconds";
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    start_resolve();
+  } else {
+
+    stopped_ = false;
+
+    start_connect(endpoint_iter);
   }
-
-  stopped_ = false;
-
-  start_connect(endpoint_iter);
 }
 
 void BdClient::stop() {

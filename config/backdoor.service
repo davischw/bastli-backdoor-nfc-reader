@@ -1,0 +1,13 @@
+[Unit]
+Description=Bastli Backdoor-Reader
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/nfc-reader
+Restart=always
+RestartSec=30
+User=backdoor
+Group=backdoor
+
+[Install]
+WantedBy=multi-user.target

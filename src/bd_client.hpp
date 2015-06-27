@@ -20,6 +20,7 @@ public:
         hostname_(config.hostname),
         port_(config.port),
         socket_(io), 
+        resolver_(io),
         signals(io, SIGINT, SIGTERM),
         reader_out(reader_out),
         reader_in(reader_in) {}
@@ -37,6 +38,8 @@ private:
   void start_client(const boost::system::error_code &ec,
              tcp::resolver::iterator endpoint_iter);
   void stop_client();
+
+  void start_resolve();
 
   void start_connect(tcp::resolver::iterator endpoint_iter);
   void handle_connect(const boost::system::error_code &ec,
@@ -73,6 +76,7 @@ private:
   // Connection variables
   boost::asio::io_service io;
   tcp::socket socket_;
+  tcp::resolver resolver_;
   boost::asio::streambuf input_buffer_;
 
   boost::asio::signal_set signals;

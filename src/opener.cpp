@@ -135,6 +135,9 @@ void Opener::run(){
 				}
 			}
 		//}
+
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
 	}
     printf("Finished running\n");
 }
@@ -176,15 +179,16 @@ int Opener::display_text(std::string text){
 }
 
 int Opener::play_sound(std::string sound_path){
-	system("sudo aplay /home/bastli/backdoor-nfc-reader/bin/mario_coin.wav");
-	system("sudo aplay /home/bastli/backdoor-nfc-reader/bin/mario_coin.wav");
-	system("sudo aplay /home/bastli/backdoor-nfc-reader/bin/mario_coin.wav");
-	system("sudo aplay /home/bastli/backdoor-nfc-reader/bin/mario_1up.wav");
+	//system("sudo aplay /home/bastli/backdoor-nfc-reader/bin/mario_coin.wav");
+	//system("sudo aplay /home/bastli/backdoor-nfc-reader/bin/mario_coin.wav");
+	//system("sudo aplay /home/bastli/backdoor-nfc-reader/bin/mario_coin.wav");
+	//system("sudo aplay /home/bastli/backdoor-nfc-reader/bin/mario_1up.wav");
 	return 1;
 }
 
 void Opener::open_to(std::string user){
 	printf("Open!\n");
+        display_text("Opening door, welcome!"); 
 	digitalWrite(DOOR_PIN, HIGH);
 	sleep(1);
 	digitalWrite(DOOR_PIN, LOW);

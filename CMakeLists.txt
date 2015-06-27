@@ -33,9 +33,27 @@ add_executable(nfc-reader src/nfc_reader.cpp src/NfcTokenReader.cpp src/NfcConte
 
 add_executable(nfc-reset src/nfc_reset.cpp src/NfcContext.cpp)
 
+
+# Setup installation
+install(TARGETS nfc-reader
+        RUNTIME DESTINATION bin)
+
+install(FILES config/backdoor.service
+        DESTINATION /usr/lib/systemd/system)
+
+install(FILES config/backdoor.conf DESTINATION /etc)
+
 include_directories(${jsoncpp_INCLUDE_DIR})
 target_link_libraries(nfc-test-client jsoncpp)
 target_link_libraries(nfc-reader jsoncpp)
+
+
+option(USE_GPERF "link gperf (Google performance measurement tools" ON)
+
+if (USE_GPERF)
+  set (CMAKE_SHARED_LINKER_FLAGS"-lprofiler")
+endif (USE_GPERF)
+
 
 # Look for Boost libraries
 find_package(Boost REQUIRED COMPONENTS system filesystem date_time thread log program_options regex)

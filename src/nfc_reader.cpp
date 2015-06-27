@@ -1,5 +1,11 @@
+#include <iostream>
+#include <fstream>
+
 // Boost Logging
+#include <boost/log/core.hpp>
+#include <boost/log/utility/setup/console.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/log/expressions.hpp>
 
 // Boost Program Options
 #include <boost/program_options.hpp>
@@ -12,6 +18,7 @@
 #include "token.h"
 #include "bd_client.hpp"
 
+
 namespace po = boost::program_options;
 
 
@@ -19,7 +26,10 @@ namespace po = boost::program_options;
 int main(int argc, char** argv) {
   po::options_description generic("Generic options");
   generic.add_options()(
-      "help", "show help message");
+      "help,h", "show help message")(
+      "debug,d", "show debug output")(
+      "config,c", po::value<std::string>()->default_value("/etc/backdoor.conf"), "use config file")(
+      "use_display", "use external display");
 
   po::options_description config_options("Configuration");
   config_options.add_options()(
@@ -31,9 +41,18 @@ int main(int argc, char** argv) {
   po::options_description cmd("Command line options");
   cmd.add(generic).add(config_options);
 
+
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, cmd), vm);
+
+  std::string config_filename = vm["config"].as<std::string>();
+
+  std::ifstream config_file(config_filename, std::ifstream::in);
+  
+  po::store(po::parse_config_file(config_file, config_options), vm);
   po::notify(vm);
+
+  config_file.close();
 
   if (vm.count("help")) {
     std::cout << cmd << std::endl;
@@ -45,12 +64,21 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  boost::log::add_console_log(std::cout, boost::log::keywords::auto_flush = true );
+
+ if (!vm.count("debug")) {
+   boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
+ }
+
+  std::cout << "Ohai, starting reader" << std::endl;
+  std::cout.flush();
 
 
   BOOST_LOG_TRIVIAL(info) << "Starting NFC-Reader";
 
   ConfigStruct config;
-  config.use_logger = false;
+  config.use_logger = vm.count("use_display");
+  
   config.cache_token_timeout = 600;
 
   config.hostname = vm["host"].as<std::string>();
