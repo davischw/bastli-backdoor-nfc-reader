@@ -66,6 +66,8 @@ void NfcTokenReader::run() {
         BOOST_LOG_TRIVIAL(trace) << "Read token xxxx with size " << token.size();
         _queue->push(token);
       }
+
+      std::this_thread::sleep_for(std::chrono::milliseconds(_sleep_ms));
     }
 
   } catch (NfcException &e) {

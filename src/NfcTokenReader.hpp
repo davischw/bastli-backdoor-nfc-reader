@@ -19,9 +19,14 @@ public:
   void start();
   void stop();
 
+
 private:
   std::thread _thread;
   bool _running = false;
+
+  // min sleep time between polling
+  int _sleep_ms = 200;
+
   LockedQueue<Token>* _queue;
 
   std::shared_ptr<NfcDevice> initialize_device();
