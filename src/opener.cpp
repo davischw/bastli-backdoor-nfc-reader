@@ -2,6 +2,7 @@
 #include "command.h"
 
 #include <boost/format.hpp>
+#include <boost/log/trivial.hpp>
 
 Opener::Opener(ConfigStruct c, LockedQueue<Token>* queue_reader,
 	LockedQueue<Json::Value>* queue_server_in, BdClient& client):
@@ -13,36 +14,36 @@ Opener::Opener(ConfigStruct c, LockedQueue<Token>* queue_reader,
 	{
 
 	if(c.use_logger == true){
-		logger = open("/dev/ttyUSB0", O_RDWR);
+		logger = open(c.logger_path.c_str(), O_RDWR);
 		if(logger < 0){
-			printf("Could not open /dev/ttyUSB0.\n");
+			BOOST_LOG_TRIVIAL(fatal) << "Could not open display device (" <<  c.logger_path << ")";
 			exit(1);
 		}
 
 		if(tcgetattr(logger, &t_config) < 0) {
-			printf("Getting current deviceconfig failed.\n");
+			BOOST_LOG_TRIVIAL(fatal) << "Getting current deviceconfig failed.";
 			exit(1);
 		}
 
 		if(cfsetispeed(&t_config, B38400) < 0 || cfsetospeed(&t_config, B38400) < 0) {
-			printf("Could not set baudrate to 38400.\n");
+			BOOST_LOG_TRIVIAL(fatal) << "Could not set baudrate to 38400.";
 			exit(1);
 		}
 
 		if(tcsetattr(logger, TCSAFLUSH, &t_config) < 0) {
-			printf("Configuration of file failed.\n");
+			BOOST_LOG_TRIVIAL(fatal) << "Configuration of file failed.";
 			exit(1);
 		}
 
 }
         // Use the gpio command to export the pin
         // This allows non-root operation
-	printf("Setting pin %i as output\n", DOOR_PIN);
-	printf((boost::format("gpio export %i out\n") % DOOR_PIN).str().c_str());
+	BOOST_LOG_TRIVIAL(info) << "Setting pin " << DOOR_PIN << "as output";
+	BOOST_LOG_TRIVIAL(debug) << (boost::format("gpio export %i out\n") % DOOR_PIN).str();
         system((boost::format("gpio export %i out") % DOOR_PIN).str().c_str());
 
 	if (wiringPiSetupSys() == -1){
-		printf("Configuration of wiringPi failed.\n");
+		BOOST_LOG_TRIVIAL(fatal) << "Configuration of wiringPi failed.";
 		exit(1);
 	}
 
@@ -60,10 +61,13 @@ void Opener::run(){
 	while(running){
 
 		if(queue_reader->size() > 0){
-			printf("Got Job (queue_size: %i)!\n", queue_reader->size());
+			BOOST_LOG_TRIVIAL(debug) << boost::format("Got Job (queue_size: %i)!\n") % queue_reader->size();
 			auto token = queue_reader->pop();
+
+                        // todo: check if we have already sent a request recently
+
 			client.send(Command::access(config.client_token, token));
-                        printf("Sent msg to bd_client (queue_size: %i)\n", queue_reader->size());
+                        BOOST_LOG_TRIVIAL(debug) << boost::format("Sent msg to bd_client (queue_size: %i)\n") % queue_reader->size();
 		}
 
 		if(queue_server_in->size() > 0){

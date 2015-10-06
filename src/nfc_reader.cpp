@@ -28,15 +28,16 @@ int main(int argc, char** argv) {
   generic.add_options()(
       "help,h", "show help message")(
       "debug,d", "show debug output")(
-      "config,c", po::value<std::string>()->default_value("/etc/backdoor.conf"), "use config file")(
-      "use_display", "use external display");
+      "config,c", po::value<std::string>()->default_value("/etc/backdoor.conf"), "use config file");
 
   po::options_description config_options("Configuration");
   config_options.add_options()(
       "host", po::value<std::string>(), "server host")(
       "port", po::value<std::string>(), "server port")(
       "server_token", po::value<std::string>(), "server authentication token")(
-      "reader_token", po::value<std::string>(), "reader authentication token");
+      "reader_token", po::value<std::string>(), "reader authentication token")(
+      "use_display", "use external display")(
+      "display_path", po::value<std::string>(), "path to display device");
 
   po::options_description cmd("Command line options");
   cmd.add(generic).add(config_options);
@@ -66,9 +67,23 @@ int main(int argc, char** argv) {
 
   boost::log::add_console_log(std::cout, boost::log::keywords::auto_flush = true );
 
- if (!vm.count("debug")) {
-   boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
- }
+  if (!vm.count("debug")) {
+    boost::log::core::get()->set_filter(boost::log::trivial::severity >= boost::log::trivial::info);
+  }
+
+  std::string logger_path;
+  bool use_logger = vm.count("use_display");
+
+  if (vm.count("display_path")) {
+    logger_path = vm["display_path"].as<std::string>();
+  } else {
+    if (use_logger) {
+      BOOST_LOG_TRIVIAL(warning) << "display_path is not set, not using external display!";
+      use_logger = false;
+    }
+  }
+    
+
 
   std::cout << "Ohai, starting reader" << std::endl;
   std::cout.flush();
@@ -77,7 +92,8 @@ int main(int argc, char** argv) {
   BOOST_LOG_TRIVIAL(info) << "Starting NFC-Reader";
 
   ConfigStruct config;
-  config.use_logger = vm.count("use_display");
+  config.use_logger = use_logger;
+  config.logger_path = logger_path;
   
   config.cache_token_timeout = 600;
 

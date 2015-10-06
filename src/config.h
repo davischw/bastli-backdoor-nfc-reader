@@ -5,6 +5,7 @@
 
 struct ConfigStruct{
 	bool use_logger;
+        std::string logger_path;
 
 	int cache_token_timeout;
 	int server_timeout;
