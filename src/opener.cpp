@@ -35,16 +35,17 @@ Opener::Opener(ConfigStruct c, LockedQueue<Token>* queue_reader,
 		}
 
 }
+        // Use the gpio command to export the pin
+        // This allows non-root operation
+	printf("Setting pin %i as output\n", DOOR_PIN);
+	printf((boost::format("gpio export %i out\n") % DOOR_PIN).str().c_str());
+        system((boost::format("gpio export %i out") % DOOR_PIN).str().c_str());
 
 	if (wiringPiSetupSys() == -1){
 		printf("Configuration of wiringPi failed.\n");
 		exit(1);
 	}
 
-        // Use the gpio command to export the pin
-        // This allows non-root operation
-	printf("Setting pin %i as output\n", DOOR_PIN);
-        system((boost::format("gpio export %i out") % DOOR_PIN).str().c_str());
 	pinMode(DOOR_PIN, OUTPUT);
 }
 
