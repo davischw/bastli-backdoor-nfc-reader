@@ -59,7 +59,7 @@ void NfcTokenReader::run() {
       auto tokens = poll(device);
       auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start);
 
-      BOOST_LOG_TRIVIAL(debug) << "Got token in " << duration.count() << "ms";
+      //BOOST_LOG_TRIVIAL(debug) << "Got token in " << duration.count() << "ms";
 
       for (auto token : tokens) {
         // add print support for token...
@@ -94,7 +94,7 @@ std::vector<Token> NfcTokenReader::poll(std::shared_ptr<NfcDevice> device) {
       }
     }
 
-    BOOST_LOG_TRIVIAL(debug) << "Processed " << i << " tokens";
+    //BOOST_LOG_TRIVIAL(debug) << "Processed " << i << " tokens";
   }
 
   return tokens;

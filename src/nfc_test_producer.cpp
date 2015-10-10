@@ -87,64 +87,23 @@ int main(int argc, char *argv[]) {
 	exit(1);
   }
 
-  amqp_exchange_declare(conn, 1, amqp_cstring_bytes("backdoor"), amqp_cstring_bytes("topic"), 0, 0, 1, 0, amqp_empty_table);
+  amqp_exchange_declare(conn, 1, amqp_cstring_bytes("backdoor"), amqp_cstring_bytes("topic"), 0, 0, 0, 0, amqp_empty_table);
   resp = amqp_get_rpc_reply(conn);
   if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
 	BOOST_LOG_TRIVIAL(error) << "Failed to declare exchange";
 	exit(1);
   }
+
+
   
-
-  // declare new queue, with auto generated name, empty argument table, and auto_delete
-  amqp_queue_declare_ok_t *r = amqp_queue_declare(conn, 1, amqp_empty_bytes, 0, 0, 0, 1,
-                                 amqp_empty_table);
-  resp = amqp_get_rpc_reply(conn);
-  if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
-	BOOST_LOG_TRIVIAL(error) << "Failed to declare queue";
-	exit(1);
-  }
-
-  amqp_bytes_t queuename;
-  queuename = amqp_bytes_malloc_dup(r->queue);
-  if (queuename.bytes == NULL) {
-	BOOST_LOG_TRIVIAL(error) << "Out of memory while copying queue name";
-	exit(1);
-  }
-
-  amqp_queue_bind(conn, 1, queuename, amqp_cstring_bytes("backdoor"), amqp_cstring_bytes("*.*.*"), amqp_empty_table);
-  resp = amqp_get_rpc_reply(conn);
-  if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
-	BOOST_LOG_TRIVIAL(error) << "Failed to declare queue";
-	exit(1);
-  }
-
-  //consume from queue
-  amqp_basic_consume(conn, 1, queuename, amqp_cstring_bytes("test_client"), 0, 1, 1, amqp_empty_table);
-  resp = amqp_get_rpc_reply(conn);
-  if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
-	BOOST_LOG_TRIVIAL(error) << "Failed to start consuming";
-	exit(1);
-  }
 
   amqp_rpc_reply_t ret;
-  amqp_envelope_t envelope;
-  while (1) { 
-    ret = amqp_consume_message(conn, &envelope, NULL, 0);
-    switch (ret.reply_type) {
-    case AMQP_RESPONSE_NORMAL:
-    	BOOST_LOG_TRIVIAL(info) << "Received normal AMQP message";
-        break;
-    case AMQP_RESPONSE_LIBRARY_EXCEPTION:
-	BOOST_LOG_TRIVIAL(error) << "Unspecified error while consuming message";
+  amqp_basic_publish(conn, 1, amqp_cstring_bytes("backdoor"), amqp_cstring_bytes("basics.access.1"), 0, 0, NULL,amqp_cstring_bytes("{ \"cmd\": { \"token\": \"migros\" } }"));
+  resp = amqp_get_rpc_reply(conn);
+  if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
+	BOOST_LOG_TRIVIAL(error) << "Failed to publish message";
 	exit(1);
-        break;
-    default:
-      BOOST_LOG_TRIVIAL(fatal) << "Unknown response while consuming message, shutting down";
-      exit(1);
-
-    }
   }
-  
 
 
   resp = amqp_channel_close(conn, 1, AMQP_REPLY_SUCCESS);

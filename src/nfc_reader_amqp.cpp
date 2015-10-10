@@ -13,12 +13,18 @@
 // Boost program options
 #include <boost/program_options.hpp>
 
+#include <boost/format.hpp>
+
 #include <amqp.h>
 #include <amqp_tcp_socket.h>
+
+#include <NfcTokenReader.hpp>
 
 
 namespace logging = boost::log;
 namespace po = boost::program_options;
+
+const std::string exchange_name = "backdoor";
 
 int main(int argc, char *argv[]) {
   po::options_description desc("Allowed options");
@@ -26,7 +32,8 @@ int main(int argc, char *argv[]) {
       "host", po::value<std::string>(), "backdoor server host")(
       "port", po::value<int>()->default_value(5672), "backdoor server port")(
       "user", po::value<std::string>(), "rabbitmq user")(
-      "password", po::value<std::string>(), "rabbitmq pw");
+      "password", po::value<std::string>(), "rabbitmq pw")(
+      "device_id", po::value<int>(), "device identification");
 
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -49,10 +56,16 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  if (!vm.count("device_id")) {
+    std::cout << "Device id has to be set" << std::endl;
+    return 1;
+  }
+
   std::string host = vm["host"].as<std::string>();
   auto port = vm["port"].as<int>();
   std::string user = vm["user"].as<std::string>();
   std::string pw = vm["password"].as<std::string>();
+  int device_id = vm["device_id"].as<int>();
 
   amqp_socket_t *socket = NULL;
   amqp_connection_state_t conn;
@@ -87,64 +100,46 @@ int main(int argc, char *argv[]) {
 	exit(1);
   }
 
-  amqp_exchange_declare(conn, 1, amqp_cstring_bytes("backdoor"), amqp_cstring_bytes("topic"), 0, 0, 1, 0, amqp_empty_table);
+  amqp_exchange_declare(conn, 1, amqp_cstring_bytes(exchange_name.c_str()), amqp_cstring_bytes("topic"), 0, 0, 0, 0, amqp_empty_table);
   resp = amqp_get_rpc_reply(conn);
   if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
 	BOOST_LOG_TRIVIAL(error) << "Failed to declare exchange";
 	exit(1);
   }
+
+  LockedQueue<Token> token_read;
+  NfcTokenReader reader(&token_read);
+  reader.start();
+
+
+  auto routing_key = (boost::format("basics.access.%d") % device_id).str();
+
   
+  while (1) {
+    if (token_read.size() > 0) {
+      BOOST_LOG_TRIVIAL(info) << "Read token!";
+      auto token = token_read.pop();
 
-  // declare new queue, with auto generated name, empty argument table, and auto_delete
-  amqp_queue_declare_ok_t *r = amqp_queue_declare(conn, 1, amqp_empty_bytes, 0, 0, 0, 1,
-                                 amqp_empty_table);
+      std::string cmd = (boost::format("{ \"cmd\": { \"token\": \"%s\"} }") % token.to_string()).str();
+
+      BOOST_LOG_TRIVIAL(debug) << "Routing: " << routing_key << ", json: " << cmd;
+      
+	  amqp_basic_publish(conn, 1, amqp_cstring_bytes(exchange_name.c_str()), amqp_cstring_bytes(routing_key.c_str()), 0, 0, NULL,amqp_cstring_bytes(cmd.c_str()));
+	  resp = amqp_get_rpc_reply(conn);
+	  if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
+		BOOST_LOG_TRIVIAL(error) << "Failed to publish message";
+		exit(1);
+	  }
+
+	    }
+  }
+
+  amqp_basic_publish(conn, 1, amqp_cstring_bytes(exchange_name.c_str()), amqp_cstring_bytes("basics.access.1"), 0, 0, NULL,amqp_cstring_bytes("{ \"cmd\": { \"token\": \"migros\" } }"));
   resp = amqp_get_rpc_reply(conn);
   if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
-	BOOST_LOG_TRIVIAL(error) << "Failed to declare queue";
+	BOOST_LOG_TRIVIAL(error) << "Failed to publish message";
 	exit(1);
   }
-
-  amqp_bytes_t queuename;
-  queuename = amqp_bytes_malloc_dup(r->queue);
-  if (queuename.bytes == NULL) {
-	BOOST_LOG_TRIVIAL(error) << "Out of memory while copying queue name";
-	exit(1);
-  }
-
-  amqp_queue_bind(conn, 1, queuename, amqp_cstring_bytes("backdoor"), amqp_cstring_bytes("*.*.*"), amqp_empty_table);
-  resp = amqp_get_rpc_reply(conn);
-  if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
-	BOOST_LOG_TRIVIAL(error) << "Failed to declare queue";
-	exit(1);
-  }
-
-  //consume from queue
-  amqp_basic_consume(conn, 1, queuename, amqp_cstring_bytes("test_client"), 0, 1, 1, amqp_empty_table);
-  resp = amqp_get_rpc_reply(conn);
-  if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
-	BOOST_LOG_TRIVIAL(error) << "Failed to start consuming";
-	exit(1);
-  }
-
-  amqp_rpc_reply_t ret;
-  amqp_envelope_t envelope;
-  while (1) { 
-    ret = amqp_consume_message(conn, &envelope, NULL, 0);
-    switch (ret.reply_type) {
-    case AMQP_RESPONSE_NORMAL:
-    	BOOST_LOG_TRIVIAL(info) << "Received normal AMQP message";
-        break;
-    case AMQP_RESPONSE_LIBRARY_EXCEPTION:
-	BOOST_LOG_TRIVIAL(error) << "Unspecified error while consuming message";
-	exit(1);
-        break;
-    default:
-      BOOST_LOG_TRIVIAL(fatal) << "Unknown response while consuming message, shutting down";
-      exit(1);
-
-    }
-  }
-  
 
 
   resp = amqp_channel_close(conn, 1, AMQP_REPLY_SUCCESS);

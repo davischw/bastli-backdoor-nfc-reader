@@ -193,7 +193,7 @@ int Opener::play_sound(std::string sound_path){
 
 void Opener::open_to(std::string user){
 	printf("Open!\n");
-        display_text("Opening door, welcome!"); 
+        display_ascii_art("Welcome!"); 
 	digitalWrite(DOOR_PIN, HIGH);
 	sleep(1);
 	digitalWrite(DOOR_PIN, LOW);

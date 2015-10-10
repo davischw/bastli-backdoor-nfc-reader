@@ -26,12 +26,16 @@ add_definitions(-DBOOST_ALL_DYN_LINK)
 # Create server test client
 add_executable(nfc-test-client src/nfc_test_client.cpp src/bd_client.cpp src/token.cpp src/command.cpp)
 
+add_executable(nfc-test-producer src/nfc_test_producer.cpp)
+
 # Create test executable for nfc personalisation
 add_executable(nfc-personalize src/nfc_personalize.cpp src/NfcContext.cpp src/NfcDevice.cpp src/token.cpp)
 
 add_executable(nfc-reader src/nfc_reader.cpp src/NfcTokenReader.cpp src/NfcContext.cpp src/NfcDevice.cpp src/opener.cpp src/token.cpp src/command.cpp src/bd_client.cpp)
+add_executable(nfc-reader-amqp src/nfc_reader_amqp.cpp src/NfcTokenReader.cpp src/NfcContext.cpp src/NfcDevice.cpp src/token.cpp src/command.cpp)
 
 add_executable(nfc-reset src/nfc_reset.cpp src/NfcContext.cpp)
+add_executable(nfc-opener src/nfc_opener.cpp)
 
 
 # Setup installation
@@ -46,6 +50,7 @@ install(FILES config/backdoor.conf DESTINATION /etc)
 include_directories(${jsoncpp_INCLUDE_DIR})
 target_link_libraries(nfc-test-client jsoncpp)
 target_link_libraries(nfc-reader jsoncpp)
+target_link_libraries(nfc-reader-amqp jsoncpp)
 
 
 option(USE_GPERF "link gperf (Google performance measurement tools" ON)
@@ -63,7 +68,10 @@ if (Boost_FOUND)
   target_link_libraries(nfc-test-client ${Boost_LIBRARIES})
   target_link_libraries(nfc-personalize ${Boost_LIBRARIES})
   target_link_libraries(nfc-reader ${Boost_LIBRARIES})
+  target_link_libraries(nfc-reader-amqp ${Boost_LIBRARIES})
   target_link_libraries(nfc-reset ${Boost_LIBRARIES})
+  target_link_libraries(nfc-test-producer ${Boost_LIBRARIES} )
+  target_link_libraries(nfc-opener ${Boost_LIBRARIES} )
 endif (Boost_FOUND)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/modules)
@@ -81,6 +89,9 @@ if (CMAKE_VERSION GREATER 3)
     target_link_libraries(nfc-personalize Threads::Threads)
     target_link_libraries(nfc-reader Threads::Threads)
     target_link_libraries(nfc-reset Threads::Threads)
+    target_link_libraries(nfc-test-producer Threads::Threads)
+    target_link_libraries(nfc-reader-amqp Threads::Threads)
+    target_link_libraries(nfc-opener Threads::Threads)
   else()
 	  message(FATAL_ERROR "PThread not found, exiting")
   endif()
@@ -91,6 +102,7 @@ find_package(wiringPi REQUIRED)
 
 include_directories(${WIRINGPI_INCLUDE_DIR})
 target_link_libraries(nfc-reader ${WIRINGPI_LIBRARY})
+target_link_libraries(nfc-opener ${WIRINGPI_LIBRARY})
 
 # Look for libnfc
 find_package(libnfc REQUIRED)
@@ -98,6 +110,7 @@ find_package(libnfc REQUIRED)
 include_directories(${LIBNFC_INCLUDE_DIR})
 target_link_libraries(nfc-personalize ${LIBNFC_LIBRARY})
 target_link_libraries(nfc-reader ${LIBNFC_LIBRARY})
+target_link_libraries(nfc-reader-amqp ${LIBNFC_LIBRARY})
 target_link_libraries(nfc-reset ${LIBNFC_LIBRARY})
 
 # Look for libfreefare
@@ -106,6 +119,13 @@ find_package(libfreefare REQUIRED)
 include_directories(${LIBFREEFARE_INCLUDE_DIR})
 target_link_libraries(nfc-personalize ${LIBFREEFARE_LIBRARY})
 target_link_libraries(nfc-reader ${LIBFREEFARE_LIBRARY})
+target_link_libraries(nfc-reader-amqp ${LIBFREEFARE_LIBRARY})
 target_link_libraries(nfc-reset ${LIBFREEFARE_LIBRARY})
 
+find_package(librabbitmq REQUIRED)
+include_directories(${LIBRABBITMQ_INCLUDE_DIR})
+target_link_libraries(nfc-test-client ${LIBRABBITMQ_LIBRARY})
+target_link_libraries(nfc-test-producer ${LIBRABBITMQ_LIBRARY} )
+target_link_libraries(nfc-reader-amqp ${LIBRABBITMQ_LIBRARY})
+target_link_libraries(nfc-opener ${LIBRABBITMQ_LIBRARY})
 include_directories(src/)
