@@ -27,7 +27,7 @@ void BdClient::send(Json::Value cmd) {
   //Add stuff to the io_service, hope this works with multiple sets...
   async_write(socket_, boost::asio::buffer(json_writer_.write(cmd)),
               boost::bind(&BdClient::handle_write, this, _1, _2));
-  
+
 }
 
 void BdClient::start_resolve() {
@@ -173,7 +173,7 @@ void BdClient::handle_read(const boost::system::error_code &ec,
   if (json_reader_.parse(is, received_json, false)) {
     // We received a valid command!
     BOOST_LOG_TRIVIAL(debug) << "Received a valid JSON command";
-    BOOST_LOG_TRIVIAL(debug) << received_json;
+    BOOST_LOG_TRIVIAL(debug) << received_json.asString();
 
     if (received_json["cmd"]["method"] == "PING") {
 
