@@ -65,16 +65,28 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  int status = amqp_socket_open(socket, host.c_str(), port);
+  struct timeval to;
+  to.tv_sec = 2;
+  to.tv_usec = 0;
+
+  BOOST_LOG_TRIVIAL(trace) << "Opening socket...";
+  int status = amqp_socket_open_noblock(socket, host.c_str(), port, &to);
   if (status) {
-    BOOST_LOG_TRIVIAL(error) << "Failed to open socket";
+    BOOST_LOG_TRIVIAL(error) << "Failed to open socket: " << amqp_error_string2(status);
     exit(1);
   }
+
+  BOOST_LOG_TRIVIAL(trace) << "Socket opened, logging in...";
 
   auto resp =  amqp_login(conn, "/", AMQP_DEFAULT_MAX_CHANNELS, AMQP_DEFAULT_FRAME_SIZE, 0, AMQP_SASL_METHOD_PLAIN, user.c_str(), pw.c_str());
 
   if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
     BOOST_LOG_TRIVIAL(error) << "Failed to login to broker";
+    if (resp.reply_type == AMQP_RESPONSE_LIBRARY_EXCEPTION) {
+      BOOST_LOG_TRIVIAL(error) << "Library error: " << amqp_error_string2(resp.library_error);
+    } else {
+      BOOST_LOG_TRIVIAL(error) << "Server error, method id: " << resp.reply.id;
+    }
     exit(1);
   }
 
@@ -87,13 +99,13 @@ int main(int argc, char *argv[]) {
 	exit(1);
   }
 
-  amqp_exchange_declare(conn, 1, amqp_cstring_bytes("backdoor"), amqp_cstring_bytes("topic"), 0, 0, 1, 0, amqp_empty_table);
+  amqp_exchange_declare(conn, 1, amqp_cstring_bytes("backdoor"), amqp_cstring_bytes("topic"), 0, 0, 0, 0, amqp_empty_table);
   resp = amqp_get_rpc_reply(conn);
   if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
 	BOOST_LOG_TRIVIAL(error) << "Failed to declare exchange";
 	exit(1);
   }
-  
+
 
   // declare new queue, with auto generated name, empty argument table, and auto_delete
   amqp_queue_declare_ok_t *r = amqp_queue_declare(conn, 1, amqp_empty_bytes, 0, 0, 0, 1,
@@ -128,7 +140,7 @@ int main(int argc, char *argv[]) {
 
   amqp_rpc_reply_t ret;
   amqp_envelope_t envelope;
-  while (1) { 
+  while (1) {
     ret = amqp_consume_message(conn, &envelope, NULL, 0);
     switch (ret.reply_type) {
     case AMQP_RESPONSE_NORMAL:
@@ -144,7 +156,7 @@ int main(int argc, char *argv[]) {
 
     }
   }
-  
+
 
 
   resp = amqp_channel_close(conn, 1, AMQP_REPLY_SUCCESS);
