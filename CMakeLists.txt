@@ -176,3 +176,7 @@ if (UNIX)
   target_link_libraries(nfc-opener ${LIBRABBITMQ_LIBRARY})
 endif()
 include_directories(src/)
+
+find_package(simpleamqpclient REQUIRED)
+include_directories("C:/Program Files (x86)/SimpleAmqpClient/include")
+target_link_libraries(nfc-personalize "C:/Program Files (x86)/SimpleAmqpClient/lib/libSimpleAmqpClient.2.dll.a")
