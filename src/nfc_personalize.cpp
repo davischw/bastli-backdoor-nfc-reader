@@ -12,6 +12,8 @@
 
 #include "json.h"
 
+#include "windows.h"
+
 #include "NfcContext.hpp"
 #include "NfcDevice.hpp"
 #include "NfcTagList.hpp"
@@ -33,31 +35,69 @@ void list_applications(MifareTag tag);
 void read_token(MifareTag tag);
 bool do_the_flasheroni(std::shared_ptr<NfcDevice> device, Token& token);
 
+bool running = true;
+
+BOOL WINAPI consoleHandler(DWORD signal) {
+  if (signal == CTRL_C_EVENT) {
+    BOOST_LOG_TRIVIAL(debug) << "Handling CTRL-C";
+    running = false;
+    return true;
+  }
+
+  return false;
+}
+
 int main(int argc, char** argv) {
   po::options_description cmd("Generic options");
   cmd.add_options()(
       "help", "show help message")(
-       "token", po::value<std::string>(), "card token");
+      "host", po::value<std::string>(), "backdoor server host")(
+      "port", po::value<int>()->default_value(5672), "backdoor server port")(
+      "user", po::value<std::string>(), "rabbitmq user")(
+      "password", po::value<std::string>(), "rabbitmq pw")(
+      "device_id", po::value<int>(), "device identification"
+      );
 
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, cmd), vm);
   po::notify(vm);
 
-  if (vm.count("help") || !(vm.count("token"))) {
+
+  if (vm.count("help")) {
     std::cout << cmd << std::endl;
     return 1;
   }
 
+  if (!(vm.count("host") && vm.count("port"))) {
+    std::cout << "host and port are required!" << std::endl;
+    std::cout << cmd << std::endl;
+    return 1;
+  }
+
+  if (!(vm.count("user") && vm.count("password"))) {
+    std::cout << "User and password are required" << std::endl;
+    std::cout << cmd << std::endl;
+    return 1;
+  }
+
+  if (!vm.count("device_id")) {
+    std::cout << "Device id has to be set" << std::endl;
+    std::cout << cmd << std::endl;
+    return 1;
+  }
+
+  std::string host = vm["host"].as<std::string>();
+  auto port = vm["port"].as<int>();
+  std::string user = vm["user"].as<std::string>();
+  std::string pw = vm["password"].as<std::string>();
+  int device_id = vm["device_id"].as<int>();
+
+  // register handler for CTRL-C
+  if (!SetConsoleCtrlHandler(consoleHandler, TRUE)) {
+    BOOST_LOG_TRIVIAL(error) << "Failed to register handler for CTRL-C!";
+  }
+
   BOOST_LOG_TRIVIAL(info) << "NFC-Personalizer v0.0.1";
-
-  std::string token_s = vm["token"].as<std::string>();
-
-
-  BOOST_LOG_TRIVIAL(trace) << "Token: " << token_s;
-
-  Token card_token(vm["token"].as<std::string>());
-
-  BOOST_LOG_TRIVIAL(trace) << "Token created..";
 
   const size_t max_devices = 8;
 
@@ -89,13 +129,11 @@ int main(int argc, char** argv) {
     // Just connect to the first device
     auto device = context->open(devices[0]);
 
-
-
-    int device_id = 2;
     std::string routing_key = (boost::format("flashing.flash.%i") % device_id).str();
+    std::string response_routing_key = (boost::format("flashing.flashed.%d") % device_id).str();
 
     //connect to rabbitMQ
-    auto chann = AmqpClient::Channel::Create("backdoor.bastli.ch", 5672, "windows_test", "foobar", "/");
+    auto chann = AmqpClient::Channel::Create(host, port, user, pw, "/");
 
     //chann->DeclareExchange("backdoor", Channel::EXCHANGE_TYPE_TOPIC)
     // create anonymous queue
@@ -107,40 +145,49 @@ int main(int argc, char** argv) {
     // start listening for messages
     auto tag = chann->BasicConsume(queueName, "flasher_device");
 
-    while (true) {
+    while (running) {
       BOOST_LOG_TRIVIAL(debug) << "Listening for flashing message";
-      auto envelope = chann->BasicConsumeMessage(tag);
-      BOOST_LOG_TRIVIAL(debug) << "Received a message";
 
-      auto msg = envelope->Message();
+      AmqpClient::Envelope::ptr_t envelope;
 
-      Json::Value json;
+      int timeout_ms = 1000;
+      if (chann->BasicConsumeMessage(tag, envelope, timeout_ms)) {
 
-      if (reader.parse(msg->Body(), json)) {
-        //do stuff with token (tm)
-        std::string token_string = json["cmd"]["token"].asString();
-        BOOST_LOG_TRIVIAL(info) << "Flashing token " << token_string;
+        //auto envelope = chann->BasicConsumeMessage(tag);
+        BOOST_LOG_TRIVIAL(debug) << "Received a message";
 
-        Token t = Token(token_string);
+        auto msg = envelope->Message();
 
-        if (do_the_flasheroni(device, t)) {
-          BOOST_LOG_TRIVIAL(info) << "Successfully flashed token!";
+        Json::Value json;
 
-          std::string resp_string = (boost::format("{\"cmd\": { \"token\": \"%s\" } }") % token_string).str();
-          auto resp = AmqpClient::BasicMessage::Create(resp_string);
+        if (reader.parse(msg->Body(), json)) {
+          //do stuff with token (tm)
+          std::string token_string = json["cmd"]["token"].asString();
+          BOOST_LOG_TRIVIAL(info) << "Flashing token " << token_string;
 
-          chann->BasicPublish("backdoor", "flashing.flashed.2", resp);
+          Token t = Token(token_string);
+
+          if (do_the_flasheroni(device, t)) {
+            BOOST_LOG_TRIVIAL(info) << "Successfully flashed token!";
+
+            std::string resp_string = (boost::format("{\"cmd\": { \"token\": \"%s\" } }") % token_string).str();
+            auto resp = AmqpClient::BasicMessage::Create(resp_string);
+
+            chann->BasicPublish("backdoor", response_routing_key, resp);
+          } else {
+            BOOST_LOG_TRIVIAL(warning) << "Failed to flash token!";
+          }
         } else {
-          BOOST_LOG_TRIVIAL(warning) << "Failed to flash token!";
+          BOOST_LOG_TRIVIAL(warning) << "Failed to parse message: " << msg->Body();
         }
-      } else {
-        BOOST_LOG_TRIVIAL(warning) << "Failed to parse message: " << msg->Body();
+
       }
-    }
 
     }
 
-  BOOST_LOG_TRIVIAL(info) << "Bastli NFC-Reader shutting down, goodbye";
+    }
+
+  BOOST_LOG_TRIVIAL(info) << "Bastli NFC-Personalizer  shutting down, goodbye";
 
   return 0;
 };
@@ -148,6 +195,8 @@ int main(int argc, char** argv) {
 // returns true if the token was flashed
 bool do_the_flasheroni(std::shared_ptr<NfcDevice> device, Token& token) {
   auto tags = device->list_tags();
+
+  bool flashed = false;
 
   // do stuff with the device
   if (tags.get_raw() == nullptr) {
@@ -205,6 +254,7 @@ bool do_the_flasheroni(std::shared_ptr<NfcDevice> device, Token& token) {
           // try to personalize card
 
           personalize_card(tags.get_raw()[i], new_key, token);
+          flashed = true;
         } else {
           if (version == bastli_key_version) {
 
@@ -274,13 +324,13 @@ bool do_the_flasheroni(std::shared_ptr<NfcDevice> device, Token& token) {
         res = mifare_desfire_disconnect(tags.get_raw()[i]);
         if (res < 0) {
           BOOST_LOG_TRIVIAL(fatal) << "Failed to disconnect from tag";
-          return 1;
+          return false;
         }
       }
     }
   }
 
-  return true;
+  return flashed;
 
 }
 
