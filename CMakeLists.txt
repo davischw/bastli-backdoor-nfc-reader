@@ -36,7 +36,7 @@ add_executable(nfc-personalize src/nfc_personalize.cpp src/NfcContext.cpp src/Nf
 
 # only build opener on linux
 if(UNIX)
-  add_executable(nfc-reader src/nfc_reader.cpp src/NfcTokenReader.cpp src/NfcContext.cpp src/NfcDevice.cpp src/opener.cpp src/token.cpp src/command.cpp src/bd_client.cpp)
+  # add_executable(nfc-reader src/nfc_reader.cpp src/NfcTokenReader.cpp src/NfcContext.cpp src/NfcDevice.cpp src/opener.cpp src/token.cpp src/command.cpp src/bd_client.cpp src/locked_queue.cpp)
 
   add_executable(nfc-reader-amqp src/nfc_reader_amqp.cpp src/NfcTokenReader.cpp src/NfcContext.cpp src/NfcDevice.cpp src/token.cpp src/command.cpp)
 endif()
@@ -47,20 +47,20 @@ add_executable(nfc-opener src/nfc_opener.cpp)
 
 # Setup installation
 if (UNIX)
-install(TARGETS nfc-reader
-        RUNTIME DESTINATION bin)
+#install(TARGETS nfc-reader
+        #RUNTIME DESTINATION bin)
 
-install(FILES config/backdoor.service
-        DESTINATION /usr/lib/systemd/system)
+#install(FILES config/backdoor.service
+        #DESTINATION /usr/lib/systemd/system)
 
-install(FILES config/backdoor.conf DESTINATION /etc)
+#install(FILES config/backdoor.conf DESTINATION /etc)
 endif()
 
 include_directories(${jsoncpp_INCLUDE_DIR})
 target_link_libraries(nfc-test-client jsoncpp)
 
 if (UNIX)
-  target_link_libraries(nfc-reader jsoncpp)
+  #target_link_libraries(nfc-reader jsoncpp)
   target_link_libraries(nfc-reader-amqp jsoncpp)
 endif()
 
@@ -93,7 +93,7 @@ if (Boost_FOUND)
   target_link_libraries(nfc-personalize ${Boost_LIBRARIES})
 
   if (UNIX)
-    target_link_libraries(nfc-reader ${Boost_LIBRARIES})
+    #target_link_libraries(nfc-reader ${Boost_LIBRARIES})
     target_link_libraries(nfc-reader-amqp ${Boost_LIBRARIES})
   endif()
   target_link_libraries(nfc-reset ${Boost_LIBRARIES})
@@ -114,7 +114,7 @@ if (UNIX)
     if (CMAKE_USE_PTHREADS_INIT)
       target_link_libraries(nfc-test-client Threads::Threads)
       target_link_libraries(nfc-personalize Threads::Threads)
-      target_link_libraries(nfc-reader Threads::Threads)
+      #target_link_libraries(nfc-reader Threads::Threads)
       target_link_libraries(nfc-reset Threads::Threads)
     target_link_libraries(nfc-test-producer Threads::Threads)
     target_link_libraries(nfc-reader-amqp Threads::Threads)
@@ -130,7 +130,7 @@ if (UNIX)
   find_package(wiringPi REQUIRED)
 
 include_directories(${WIRINGPI_INCLUDE_DIR})
-target_link_libraries(nfc-reader ${WIRINGPI_LIBRARY})
+#target_link_libraries(nfc-reader ${WIRINGPI_LIBRARY})
 target_link_libraries(nfc-opener ${WIRINGPI_LIBRARY})
 endif()
 
@@ -141,9 +141,8 @@ include_directories(${LIBNFC_INCLUDE_DIR})
 target_link_libraries(nfc-personalize ${LIBNFC_LIBRARY})
 
 if (UNIX)
-  target_link_libraries(nfc-reader ${LIBNFC_LIBRARY})
+  #target_link_libraries(nfc-reader ${LIBNFC_LIBRARY})
   target_link_libraries(nfc-reader-amqp ${LIBNFC_LIBRARY})
-  target_link_libraries(nfc-reader ${LIBNFC_LIBRARY})
 endif()
 target_link_libraries(nfc-reset ${LIBNFC_LIBRARY})
 
@@ -154,7 +153,7 @@ include_directories(${LIBFREEFARE_INCLUDE_DIR})
 target_link_libraries(nfc-personalize ${LIBFREEFARE_LIBRARY})
 
 if (UNIX)
-  target_link_libraries(nfc-reader ${LIBFREEFARE_LIBRARY})
+  #target_link_libraries(nfc-reader ${LIBFREEFARE_LIBRARY})
   target_link_libraries(nfc-reader-amqp ${LIBFREEFARE_LIBRARY})
 endif()
 

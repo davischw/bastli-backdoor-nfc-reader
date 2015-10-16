@@ -24,6 +24,8 @@
 namespace logging = boost::log;
 namespace po = boost::program_options;
 
+using std::chrono::system_clock;
+
 const std::string exchange_name = "backdoor";
 
 int main(int argc, char *argv[]) {
@@ -100,12 +102,13 @@ int main(int argc, char *argv[]) {
 	exit(1);
   }
 
+  /*
   amqp_exchange_declare(conn, 1, amqp_cstring_bytes(exchange_name.c_str()), amqp_cstring_bytes("topic"), 0, 0, 0, 0, amqp_empty_table);
   resp = amqp_get_rpc_reply(conn);
   if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
 	BOOST_LOG_TRIVIAL(error) << "Failed to declare exchange";
 	exit(1);
-  }
+  } */
 
   LockedQueue<Token> token_read;
   NfcTokenReader reader(&token_read);
@@ -114,8 +117,18 @@ int main(int argc, char *argv[]) {
 
   auto routing_key = (boost::format("basics.access.%d") % device_id).str();
 
+  bool running = true;
   
-  while (1) {
+  while (running) {
+
+    if (token_read.size() == 0) {
+	    //wait for condition variable
+	    std::unique_lock<std::mutex> mlock(token_read.lock);
+	    BOOST_LOG_TRIVIAL(trace) << "Waiting for token...";
+	    token_read.object_added.wait_for(mlock, std::chrono::seconds(5));    
+    }
+
+
     if (token_read.size() > 0) {
       BOOST_LOG_TRIVIAL(info) << "Read token!";
       auto token = token_read.pop();
@@ -130,15 +143,16 @@ int main(int argc, char *argv[]) {
 		BOOST_LOG_TRIVIAL(error) << "Failed to publish message";
 		exit(1);
 	  }
+    }
 
-	    }
-  }
+    auto last_reader_update = system_clock::now() - reader.last_update;
 
-  amqp_basic_publish(conn, 1, amqp_cstring_bytes(exchange_name.c_str()), amqp_cstring_bytes("basics.access.1"), 0, 0, NULL,amqp_cstring_bytes("{ \"cmd\": { \"token\": \"migros\" } }"));
-  resp = amqp_get_rpc_reply(conn);
-  if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
-	BOOST_LOG_TRIVIAL(error) << "Failed to publish message";
-	exit(1);
+    if (last_reader_update > std::chrono::seconds(5)) {
+	BOOST_LOG_TRIVIAL(warning) << "Reader br0kn, shutting down..";
+        running = false;
+    } else {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
   }
 
 

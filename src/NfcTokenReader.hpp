@@ -19,6 +19,7 @@ public:
   void start();
   void stop();
 
+  std::chrono::system_clock::time_point last_update;
 
 private:
   std::thread _thread;

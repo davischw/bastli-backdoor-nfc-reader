@@ -59,13 +59,15 @@ void NfcTokenReader::run() {
       auto tokens = poll(device);
       auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start);
 
-      //BOOST_LOG_TRIVIAL(debug) << "Got token in " << duration.count() << "ms";
+      BOOST_LOG_TRIVIAL(debug) << "Got token in " << duration.count() << "ms";
 
       for (auto token : tokens) {
         // add print support for token...
         BOOST_LOG_TRIVIAL(trace) << "Read token xxxx with size " << token.size();
         _queue->push(token);
       }
+
+      last_update = std::chrono::system_clock::now();
 
       std::this_thread::sleep_for(std::chrono::milliseconds(_sleep_ms));
     }
