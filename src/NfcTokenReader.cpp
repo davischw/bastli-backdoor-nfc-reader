@@ -113,7 +113,7 @@ boost::optional<Token> NfcTokenReader::read_tag(MifareTag tag) {
     return boost::none;
   }
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start);
-  
+
   BOOST_LOG_TRIVIAL(debug) << "Verified tag type in " << duration.count() << "ms";
 
   // Connect
@@ -124,7 +124,7 @@ boost::optional<Token> NfcTokenReader::read_tag(MifareTag tag) {
     return boost::none;
   }
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start);
-  
+
   BOOST_LOG_TRIVIAL(debug) << "Connect to tag in " << duration.count() << "ms";
 
   struct mifare_desfire_version_info info;
@@ -134,7 +134,7 @@ boost::optional<Token> NfcTokenReader::read_tag(MifareTag tag) {
     return boost::none;
   }
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start);
-  
+
   BOOST_LOG_TRIVIAL(debug) << "Got version after " << duration.count() << "ms";
 
   if (info.software.version_major < 1) {
@@ -150,7 +150,7 @@ boost::optional<Token> NfcTokenReader::read_tag(MifareTag tag) {
       bastli_key, bastli_key_version);
 
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start);
-  
+
   BOOST_LOG_TRIVIAL(debug) << "Start auth after " << duration.count() << "ms";
 
   res = mifare_desfire_authenticate(tag, 0, new_key.get_raw());
@@ -163,7 +163,7 @@ boost::optional<Token> NfcTokenReader::read_tag(MifareTag tag) {
   }
 
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start);
-  
+
   BOOST_LOG_TRIVIAL(debug) << "Authenticated to tag after after " << duration.count() << "ms";
 
   const uint32_t bastli_backdoor_aid = 0x5;
@@ -187,7 +187,7 @@ boost::optional<Token> NfcTokenReader::read_tag(MifareTag tag) {
     return boost::none;
   }
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start);
-  
+
   BOOST_LOG_TRIVIAL(debug) << "Selected application in " << duration.count() << "ms";
 
   // authenticate with default_key
@@ -199,7 +199,7 @@ boost::optional<Token> NfcTokenReader::read_tag(MifareTag tag) {
     return boost::none;
   }
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start);
-  
+
   BOOST_LOG_TRIVIAL(debug) << "Authenticated to application in" << duration.count() << "ms";
 
   // The mifare_desfire_read_data function is broken
@@ -239,7 +239,7 @@ boost::optional<Token> NfcTokenReader::read_tag(MifareTag tag) {
 
   BOOST_LOG_TRIVIAL(trace) << "Freed bastli_aid";
   duration = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start);
-  
+
   BOOST_LOG_TRIVIAL(debug) << "read_tag in " << duration.count() << "ms";
 
   return token;

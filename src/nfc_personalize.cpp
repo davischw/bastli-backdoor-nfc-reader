@@ -4,7 +4,15 @@
 
 #include <boost/program_options.hpp>
 
+#include <boost/format.hpp>
+
 #include <iostream>
+
+#include <SimpleAmqpClient/SimpleAmqpClient.h>
+
+#include "json.h"
+
+#include "windows.h"
 
 #include "NfcContext.hpp"
 #include "NfcDevice.hpp"
@@ -25,36 +33,77 @@ const uint8_t bastli_key_version = 1;
 void personalize_card(MifareTag tag, MifareDesfireKey &new_key, Token card_token);
 void list_applications(MifareTag tag);
 void read_token(MifareTag tag);
+bool do_the_flasheroni(std::shared_ptr<NfcDevice> device, Token& token);
+
+bool running = true;
+
+BOOL WINAPI consoleHandler(DWORD signal) {
+  if (signal == CTRL_C_EVENT) {
+    BOOST_LOG_TRIVIAL(debug) << "Handling CTRL-C";
+    running = false;
+    return true;
+  }
+
+  return false;
+}
 
 int main(int argc, char** argv) {
   po::options_description cmd("Generic options");
   cmd.add_options()(
       "help", "show help message")(
-       "token", po::value<std::string>(), "card token");
+      "host", po::value<std::string>(), "backdoor server host")(
+      "port", po::value<int>()->default_value(5672), "backdoor server port")(
+      "user", po::value<std::string>(), "rabbitmq user")(
+      "password", po::value<std::string>(), "rabbitmq pw")(
+      "device_id", po::value<int>(), "device identification"
+      );
 
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, cmd), vm);
   po::notify(vm);
 
-  if (vm.count("help") || !(vm.count("token"))) {
+
+  if (vm.count("help")) {
     std::cout << cmd << std::endl;
     return 1;
   }
 
+  if (!(vm.count("host") && vm.count("port"))) {
+    std::cout << "host and port are required!" << std::endl;
+    std::cout << cmd << std::endl;
+    return 1;
+  }
+
+  if (!(vm.count("user") && vm.count("password"))) {
+    std::cout << "User and password are required" << std::endl;
+    std::cout << cmd << std::endl;
+    return 1;
+  }
+
+  if (!vm.count("device_id")) {
+    std::cout << "Device id has to be set" << std::endl;
+    std::cout << cmd << std::endl;
+    return 1;
+  }
+
+  std::string host = vm["host"].as<std::string>();
+  auto port = vm["port"].as<int>();
+  std::string user = vm["user"].as<std::string>();
+  std::string pw = vm["password"].as<std::string>();
+  int device_id = vm["device_id"].as<int>();
+
+  // register handler for CTRL-C
+  if (!SetConsoleCtrlHandler(consoleHandler, TRUE)) {
+    BOOST_LOG_TRIVIAL(error) << "Failed to register handler for CTRL-C!";
+  }
+
   BOOST_LOG_TRIVIAL(info) << "NFC-Personalizer v0.0.1";
-
-  std::string token_s = vm["token"].as<std::string>();
-
-
-  BOOST_LOG_TRIVIAL(trace) << "Token: " << token_s;
-
-  Token card_token(vm["token"].as<std::string>());
-
-  BOOST_LOG_TRIVIAL(trace) << "Token created..";
 
   const size_t max_devices = 8;
 
   std::shared_ptr<NfcContext> context;
+
+  Json::Reader reader;
 
   try {
     // Setup nfc context
@@ -80,144 +129,210 @@ int main(int argc, char** argv) {
     // Just connect to the first device
     auto device = context->open(devices[0]);
 
-    auto tags = device->list_tags();
+    std::string routing_key = (boost::format("flashing.flash.%i") % device_id).str();
+    std::string response_routing_key = (boost::format("flashing.flashed.%d") % device_id).str();
 
-    // do stuff with the device
-    if (tags.get_raw() == nullptr) {
-      BOOST_LOG_TRIVIAL(warning) << "Failed to listen tags";
-    } else {
-      for (int i = 0; tags.get_raw()[i]; i++) {
-        if (DESFIRE == freefare_get_tag_type(tags.get_raw()[i])) {
-          // We found a desfire, check if it is personalized to Bastli
-          BOOST_LOG_TRIVIAL(info)
-              << "Found tag: "
-              << freefare_get_tag_friendly_name(tags.get_raw()[i]);
+    //connect to rabbitMQ
+    auto chann = AmqpClient::Channel::Create(host, port, user, pw, "/");
 
-          // Connect
-          int res;
-          res = mifare_desfire_connect(tags.get_raw()[i]);
-          if (res < 0) {
-            BOOST_LOG_TRIVIAL(warning) << "Failed to connect to Mifare DESFire";
-            continue;
-          }
+    //chann->DeclareExchange("backdoor", Channel::EXCHANGE_TYPE_TOPIC)
+    // create anonymous queue
+    auto queueName = chann->DeclareQueue("");
+    chann->BindQueue(queueName, "backdoor", routing_key, AmqpClient::Table());
 
-          struct mifare_desfire_version_info info;
-          res = mifare_desfire_get_version(tags.get_raw()[i], &info);
-          if (res < 0) {
-            freefare_perror(tags.get_raw()[i], "mifare_desfire_get_version");
-            break;
-          }
+    BOOST_LOG_TRIVIAL(debug) << "Connected to broker, created queue";
 
-          if (info.software.version_major < 1) {
-            // for some reason old software doesn't work...
-            BOOST_LOG_TRIVIAL(info) << "Software is too old, not using card";
-            break;
-          }
+    // start listening for messages
+    auto tag = chann->BasicConsume(queueName, "flasher_device");
 
-          uint8_t version = 0;
-          res = mifare_desfire_get_key_version(tags.get_raw()[i], 0, &version);
-          if (res < 0) {
-            BOOST_LOG_TRIVIAL(warning) << "Failed to get key version";
+    while (running) {
+      BOOST_LOG_TRIVIAL(debug) << "Listening for flashing message";
+
+      AmqpClient::Envelope::ptr_t envelope;
+
+      int timeout_ms = 1000;
+      if (chann->BasicConsumeMessage(tag, envelope, timeout_ms)) {
+
+        //auto envelope = chann->BasicConsumeMessage(tag);
+        BOOST_LOG_TRIVIAL(debug) << "Received a message";
+
+        auto msg = envelope->Message();
+
+        Json::Value json;
+
+        if (reader.parse(msg->Body(), json)) {
+          //do stuff with token (tm)
+          std::string token_string = json["cmd"]["token"].asString();
+          BOOST_LOG_TRIVIAL(info) << "Flashing token " << token_string;
+
+          Token t = Token(token_string);
+
+          if (do_the_flasheroni(device, t)) {
+            BOOST_LOG_TRIVIAL(info) << "Successfully flashed token!";
+
+            std::string resp_string = (boost::format("{\"cmd\": { \"token\": \"%s\" } }") % token_string).str();
+            auto resp = AmqpClient::BasicMessage::Create(resp_string);
+
+            chann->BasicPublish("backdoor", response_routing_key, resp);
           } else {
-            // for some reason Boost Log does not print a zero interger
-            // BOOST_LOG_TRIVIAL(info) << "Master key version: " << version;
-            printf("Master key version: %d\n", version);
+            BOOST_LOG_TRIVIAL(warning) << "Failed to flash token!";
           }
+        } else {
+          BOOST_LOG_TRIVIAL(warning) << "Failed to parse message: " << msg->Body();
+        }
 
-          // Try to list all applications
-          list_applications(tags.get_raw()[i]);
+      }
 
-          auto new_key = MifareDesfireKey::create_aes_key_with_version(
-              bastli_key, bastli_key_version);
-          // WARNING: setting the key version with the function below does not
-          // work!
-          // mifare_desfire_key_set_version(new_key, bastli_key_version);
+    }
 
-          if (version == 0) {
-            // key version 0 is used for default key
-            // try to personalize card
+    }
 
-            personalize_card(tags.get_raw()[i], new_key, card_token);
-          } else {
-            if (version == bastli_key_version) {
+  BOOST_LOG_TRIVIAL(info) << "Bastli NFC-Personalizer  shutting down, goodbye";
+
+  return 0;
+};
+
+// returns true if the token was flashed
+bool do_the_flasheroni(std::shared_ptr<NfcDevice> device, Token& token) {
+  auto tags = device->list_tags();
+
+  bool flashed = false;
+
+  // do stuff with the device
+  if (tags.get_raw() == nullptr) {
+    BOOST_LOG_TRIVIAL(warning) << "Failed to listen tags";
+  } else {
+    for (int i = 0; tags.get_raw()[i]; i++) {
+      if (DESFIRE == freefare_get_tag_type(tags.get_raw()[i])) {
+        // We found a desfire, check if it is personalized to Bastli
+        BOOST_LOG_TRIVIAL(info)
+            << "Found tag: "
+            << freefare_get_tag_friendly_name(tags.get_raw()[i]);
+
+        // Connect
+        int res;
+        res = mifare_desfire_connect(tags.get_raw()[i]);
+        if (res < 0) {
+          BOOST_LOG_TRIVIAL(warning) << "Failed to connect to Mifare DESFire";
+          continue;
+        }
+
+        struct mifare_desfire_version_info info;
+        res = mifare_desfire_get_version(tags.get_raw()[i], &info);
+        if (res < 0) {
+          freefare_perror(tags.get_raw()[i], "mifare_desfire_get_version");
+          break;
+        }
+
+        if (info.software.version_major < 1) {
+          // for some reason old software doesn't work...
+          BOOST_LOG_TRIVIAL(info) << "Software is too old, not using card";
+          break;
+        }
+
+        uint8_t version = 0;
+        res = mifare_desfire_get_key_version(tags.get_raw()[i], 0, &version);
+        if (res < 0) {
+          BOOST_LOG_TRIVIAL(warning) << "Failed to get key version";
+        } else {
+          // for some reason Boost Log does not print a zero interger
+          // BOOST_LOG_TRIVIAL(info) << "Master key version: " << version;
+          BOOST_LOG_TRIVIAL(debug) << (boost::format("Master key version: %d\n") % version).str();
+        }
+
+        // Try to list all applications
+        list_applications(tags.get_raw()[i]);
+
+        auto new_key = MifareDesfireKey::create_aes_key_with_version(
+            bastli_key, bastli_key_version);
+        // WARNING: setting the key version with the function below does not
+        // work!
+        // mifare_desfire_key_set_version(new_key, bastli_key_version);
+
+        if (version == 0) {
+          // key version 0 is used for default key
+          // try to personalize card
+
+          personalize_card(tags.get_raw()[i], new_key, token);
+          flashed = true;
+        } else {
+          if (version == bastli_key_version) {
+
+            res = mifare_desfire_authenticate(tags.get_raw()[i], 0,
+                                              new_key.get_raw());
+            if (res < 0) {
+              freefare_perror(tags.get_raw()[i],
+                              "mifare_desfire_authenticate");
+              BOOST_LOG_TRIVIAL(warning) << "Card is neither using default "
+                                            "key nor bastli key, ignoring "
+                                            "card";
+            } else {
+              BOOST_LOG_TRIVIAL(info) << "Successful authentication, card is "
+                                         "personalized with Bastli key";
+
+              // Test code...
+
+              BOOST_LOG_TRIVIAL(info)
+                  << "Trying to delete Bastli application";
+              MifareDESFireAID bastli_aid =
+                  mifare_desfire_aid_new(bastli_backdoor_aid);
+
+              if (bastli_aid == nullptr) {
+                BOOST_LOG_TRIVIAL(error) << "Failed to create Bastli AID";
+                freefare_perror(tags.get_raw()[i], "mifare_desfire_aid_new");
+              } else {
+                res = mifare_desfire_delete_application(tags.get_raw()[i],
+                                                        bastli_aid);
+                if (res < 0) {
+                  freefare_perror(tags.get_raw()[i],
+                                  "mifare_desfire_delete_application");
+                }
+                free(bastli_aid);
+              }
 
               res = mifare_desfire_authenticate(tags.get_raw()[i], 0,
                                                 new_key.get_raw());
               if (res < 0) {
                 freefare_perror(tags.get_raw()[i],
                                 "mifare_desfire_authenticate");
-                BOOST_LOG_TRIVIAL(warning) << "Card is neither using default "
-                                              "key nor bastli key, ignoring "
-                                              "card";
+                BOOST_LOG_TRIVIAL(error) << "Failed to authenticate with "
+                                            "bastli key, unable to reset key";
               } else {
-                BOOST_LOG_TRIVIAL(info) << "Successful authentication, card is "
-                                           "personalized with Bastli key";
 
-                // Test code...
+                auto default_key = MifareDesfireKey::create_des_key(null_key);
+                // authenticate with default_key
 
                 BOOST_LOG_TRIVIAL(info)
-                    << "Trying to delete Bastli application";
-                MifareDESFireAID bastli_aid =
-                    mifare_desfire_aid_new(bastli_backdoor_aid);
+                    << "Trying to reset card to default key";
+                res = mifare_desfire_change_key(tags.get_raw()[i], 0,
+                                                default_key.get_raw(),
+                                                new_key.get_raw());
 
-                if (bastli_aid == nullptr) {
-                  BOOST_LOG_TRIVIAL(error) << "Failed to create Bastli AID";
-                  freefare_perror(tags.get_raw()[i], "mifare_desfire_aid_new");
-                } else {
-                  res = mifare_desfire_delete_application(tags.get_raw()[i],
-                                                          bastli_aid);
-                  if (res < 0) {
-                    freefare_perror(tags.get_raw()[i],
-                                    "mifare_desfire_delete_application");
-                  }
-                  free(bastli_aid);
-                }
-
-                res = mifare_desfire_authenticate(tags.get_raw()[i], 0,
-                                                  new_key.get_raw());
                 if (res < 0) {
                   freefare_perror(tags.get_raw()[i],
-                                  "mifare_desfire_authenticate");
-                  BOOST_LOG_TRIVIAL(error) << "Failed to authenticate with "
-                                              "bastli key, unable to reset key";
+                                  "mifare_desfire_change_key");
                 } else {
-
-                  auto default_key = MifareDesfireKey::create_des_key(null_key);
-                  // authenticate with default_key
-
                   BOOST_LOG_TRIVIAL(info)
-                      << "Trying to reset card to default key";
-                  res = mifare_desfire_change_key(tags.get_raw()[i], 0,
-                                                  default_key.get_raw(),
-                                                  new_key.get_raw());
-
-                  if (res < 0) {
-                    freefare_perror(tags.get_raw()[i],
-                                    "mifare_desfire_change_key");
-                  } else {
-                    BOOST_LOG_TRIVIAL(info)
-                        << "Successfully reset card to default key";
-                  }
+                      << "Successfully reset card to default key";
                 }
-                // End test code...
               }
+              // End test code...
             }
           }
+        }
 
-          res = mifare_desfire_disconnect(tags.get_raw()[i]);
-          if (res < 0) {
-            BOOST_LOG_TRIVIAL(fatal) << "Failed to disconnect from tag";
-            return 1;
-          }
+        res = mifare_desfire_disconnect(tags.get_raw()[i]);
+        if (res < 0) {
+          BOOST_LOG_TRIVIAL(fatal) << "Failed to disconnect from tag";
+          return false;
         }
       }
     }
   }
 
-  BOOST_LOG_TRIVIAL(info) << "Bastli NFC-Reader shutting down, goodbye";
+  return flashed;
 
-  return 0;
-};
+}
 
 void personalize_card(MifareTag tag, MifareDesfireKey &new_key, Token card_token) {
   auto default_key = MifareDesfireKey::create_des_key(null_key);

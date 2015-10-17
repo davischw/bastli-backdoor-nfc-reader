@@ -94,17 +94,12 @@ int main(int argc, char *argv[]) {
 	exit(1);
   }
 
-
-  
-
-  amqp_rpc_reply_t ret;
   amqp_basic_publish(conn, 1, amqp_cstring_bytes("backdoor"), amqp_cstring_bytes("basics.access.1"), 0, 0, NULL,amqp_cstring_bytes("{ \"cmd\": { \"token\": \"migros\" } }"));
   resp = amqp_get_rpc_reply(conn);
   if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
 	BOOST_LOG_TRIVIAL(error) << "Failed to publish message";
 	exit(1);
   }
-
 
   resp = amqp_channel_close(conn, 1, AMQP_REPLY_SUCCESS);
   resp = amqp_connection_close(conn, AMQP_REPLY_SUCCESS);
