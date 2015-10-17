@@ -68,17 +68,12 @@ install(TARGETS nfc-reader-amqp
 #install(FILES config/backdoor.service
 #        DESTINATION /usr/lib/systemd/system)
 
+
 #install(FILES config/backdoor.conf DESTINATION /etc)
 endif()
 
 include_directories(${jsoncpp_INCLUDE_DIR})
 target_link_libraries(bd-commands jsoncpp)
-
-option(USE_GPERF "link gperf (Google performance measurement tools" ON)
-
-if (USE_GPERF)
-  set (CMAKE_SHARED_LINKER_FLAGS"-lprofiler")
-endif (USE_GPERF)
 
 
 # On Windows, add a BOOST_ROOT variable, which can be used to enter the
@@ -106,6 +101,7 @@ if (Boost_FOUND)
   endif()
 
   if (UNIX)
+    #target_link_libraries(nfc-reader ${Boost_LIBRARIES})
     target_link_libraries(nfc-opener ${Boost_LIBRARIES} )
   endif()
 
@@ -126,8 +122,7 @@ if (UNIX)
     find_package(Threads REQUIRED)
     if (CMAKE_USE_PTHREADS_INIT)
       target_link_libraries(nfc-test-client Threads::Threads)
-      target_link_libraries(nfc-personalize Threads::Threads)
-      target_link_libraries(nfc-reader Threads::Threads)
+      #target_link_libraries(nfc-reader Threads::Threads)
       target_link_libraries(nfc-reset Threads::Threads)
     target_link_libraries(nfc-test-producer Threads::Threads)
     target_link_libraries(nfc-reader-amqp Threads::Threads)
@@ -143,6 +138,7 @@ if (UNIX)
   find_package(wiringPi REQUIRED)
 
 include_directories(${WIRINGPI_INCLUDE_DIR})
+
 target_link_libraries(nfc-opener ${WIRINGPI_LIBRARY})
 endif()
 
@@ -169,6 +165,7 @@ if (UNIX)
   target_link_libraries(nfc-opener ${LIBRABBITMQ_LIBRARY})
 endif()
 include_directories(src/)
+
 
 if (WIN32)
   find_package(simpleamqpclient REQUIRED)
