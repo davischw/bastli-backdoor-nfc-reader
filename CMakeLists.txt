@@ -27,16 +27,18 @@ endif()
 
 
 add_library(bd-token src/token.cpp)
-add_library(nfc-cpp-wrapper src/NfcTokenReader.cpp src/NfCDevice.cpp src/NfcContext.cpp)
+add_library(nfc-cpp-wrapper src/NfcTokenReader.cpp src/NfcDevice.cpp src/NfcContext.cpp)
 add_library(bd-commands src/command.cpp)
 
 target_link_libraries(bd-commands bd-token)
 target_link_libraries(nfc-cpp-wrapper bd-commands)
 
 
-# Create test executable for nfc personalisation
-add_executable(nfc-personalize src/nfc_personalize.cpp)
-target_link_libraries(nfc-personalize nfc-cpp-wrapper)
+# Create executable for nfc personalisation
+if (WIN32)
+  add_executable(nfc-personalize src/nfc_personalize.cpp)
+  target_link_libraries(nfc-personalize nfc-cpp-wrapper)
+endif()
 
 
 
@@ -48,9 +50,6 @@ add_executable(nfc-test-producer src/nfc_test_producer.cpp)
 
 # only build opener on linux
 if(UNIX)
-  add_executable(nfc-reader src/nfc_reader.cpp src/bd_client.cpp)
-  target_link_libraries(nfc-reader nfc-cpp-wrapper)
-
   add_executable(nfc-opener src/nfc_opener.cpp)
   target_link_libraries(nfc-opener bd-commands)
 endif()
@@ -63,13 +62,13 @@ target_link_libraries(nfc-reset nfc-cpp-wrapper)
 
 # Setup installation
 if (UNIX)
-install(TARGETS nfc-reader
+install(TARGETS nfc-reader-amqp
         RUNTIME DESTINATION bin)
 
-install(FILES config/backdoor.service
-        DESTINATION /usr/lib/systemd/system)
+#install(FILES config/backdoor.service
+#        DESTINATION /usr/lib/systemd/system)
 
-install(FILES config/backdoor.conf DESTINATION /etc)
+#install(FILES config/backdoor.conf DESTINATION /etc)
 endif()
 
 include_directories(${jsoncpp_INCLUDE_DIR})
@@ -101,10 +100,12 @@ find_package(Boost REQUIRED COMPONENTS log thread system filesystem date_time pr
 if (Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
   target_link_libraries(nfc-test-client ${Boost_LIBRARIES})
-  target_link_libraries(nfc-personalize ${Boost_LIBRARIES})
+
+  if (WIN32)
+    target_link_libraries(nfc-personalize ${Boost_LIBRARIES})
+  endif()
 
   if (UNIX)
-    target_link_libraries(nfc-reader ${Boost_LIBRARIES})
     target_link_libraries(nfc-opener ${Boost_LIBRARIES} )
   endif()
 
@@ -142,7 +143,6 @@ if (UNIX)
   find_package(wiringPi REQUIRED)
 
 include_directories(${WIRINGPI_INCLUDE_DIR})
-target_link_libraries(nfc-reader ${WIRINGPI_LIBRARY})
 target_link_libraries(nfc-opener ${WIRINGPI_LIBRARY})
 endif()
 
@@ -159,13 +159,6 @@ find_package(libfreefare REQUIRED)
 include_directories(${LIBFREEFARE_INCLUDE_DIR})
 target_link_libraries(nfc-cpp-wrapper ${LIBFREEFARE_LIBRARY})
 
-if (UNIX)
-  target_link_libraries(nfc-reader ${LIBFREEFARE_LIBRARY})
-endif()
-
-target_link_libraries(nfc-reader-amqp ${LIBFREEFARE_LIBRARY})
-target_link_libraries(nfc-reset ${LIBFREEFARE_LIBRARY})
-
 find_package(librabbitmq REQUIRED)
 include_directories(${LIBRABBITMQ_INCLUDE_DIR})
 target_link_libraries(nfc-test-client ${LIBRABBITMQ_LIBRARY})
@@ -177,6 +170,8 @@ if (UNIX)
 endif()
 include_directories(src/)
 
-find_package(simpleamqpclient REQUIRED)
-include_directories(${SIMPLEAMQPCLIENT_INCLUDE_DIR})
-target_link_libraries(nfc-personalize ${SIMPLEAMQPCLIENT_LIBRARY})
+if (WIN32)
+  find_package(simpleamqpclient REQUIRED)
+  include_directories(${SIMPLEAMQPCLIENT_INCLUDE_DIR})
+  target_link_libraries(nfc-personalize ${SIMPLEAMQPCLIENT_LIBRARY})
+endif()
