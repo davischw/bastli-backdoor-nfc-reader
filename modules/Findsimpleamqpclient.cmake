@@ -2,4 +2,4 @@
 
 include(LibFindMacros)
 
-libfind_pkg_detect(SIMPLEAMQPCLIENT simpleamqpclient FIND_PATH SimpleAmqpClient/SimpleAmqpClient.h FIND_LIBRARY simpleamqpclient)
+libfind_pkg_detect(SIMPLEAMQPCLIENT simpleamqpclient FIND_PATH SimpleAmqpClient/SimpleAmqpClient.h FIND_LIBRARY SimpleAmqpClient)

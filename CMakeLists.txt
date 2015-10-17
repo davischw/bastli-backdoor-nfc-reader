@@ -161,14 +161,15 @@ target_link_libraries(nfc-test-client ${LIBRABBITMQ_LIBRARY})
 target_link_libraries(nfc-test-producer ${LIBRABBITMQ_LIBRARY} )
 target_link_libraries(nfc-reader-amqp ${LIBRABBITMQ_LIBRARY})
 
-if (UNIX)
-  target_link_libraries(nfc-opener ${LIBRABBITMQ_LIBRARY})
-endif()
 include_directories(src/)
 
+find_package(simpleamqpclient REQUIRED)
+include_directories(${SIMPLEAMQPCLIENT_INCLUDE_DIR})
+
+if (UNIX)
+  target_link_libraries(nfc-opener ${SIMPLEAMQPCLIENT_LIBRARY})
+endif()
 
 if (WIN32)
-  find_package(simpleamqpclient REQUIRED)
-  include_directories(${SIMPLEAMQPCLIENT_INCLUDE_DIR})
   target_link_libraries(nfc-personalize ${SIMPLEAMQPCLIENT_LIBRARY})
 endif()
