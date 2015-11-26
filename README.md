@@ -32,4 +32,34 @@ backdoor tools.
     $ make
     $ sudo make install
     
+
+## NFC Reader configuration
+
+To enable libnfc to find the NFC-Reader, place a config file at `/etc/nfc/devices.d/bastli_reader.conf`
+with the following content, where `/dev/ttyUSB0` has to be the actual
+USB serial device of the reader.
+
+    name = "Bastli Reader"
+    connstring = "pn532_uart:/dev/ttyUSB0"
+
+## Autostart configuration
+
+SystemD is used to automatically start the reader and opener on system boot
+as service. To enable this, run the following commands, which create a backdoor
+user, adds it to the dialout group (needed for access rights to usb serial ports),
+and then enable automatic startup.
+
+    $ sudo adduser backdoor --system --no-create-home --group
+    $ sudo usermod -a -G dialout backdoor
+    $ sudo systemctl enable backdoor-reader
+    $ sudo systemctl enable backdoor-opener
+
+To query the state of the background service:
+
+    $ sudo systemctl status backdoor-reader
+    $ sudo systemctl status backdoor-opener
     
+To get the log output:
+
+    $ sudo journalctl -u backdoor-reader
+    $ sudo journalctl -u backdoor-opener
