@@ -1,0 +1,13 @@
+[Unit]
+Description=Bastli Backdoor-Opener
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/nfc-opener --host backdoor.bastli.ch --user windows_test --password foobar --device_id 1
+Restart=always
+RestartSec=30
+User=backdoor
+Group=backdoor
+
+[Install]
+WantedBy=multi-user.target

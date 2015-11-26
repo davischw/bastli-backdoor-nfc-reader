@@ -65,13 +65,13 @@ target_link_libraries(nfc-reset nfc-cpp-wrapper)
 
 # Setup installation
 if (UNIX)
-#install(TARGETS nfc-reader
-        #RUNTIME DESTINATION bin)
+install(TARGETS nfc-reader-amqp nfc-opener
+        RUNTIME DESTINATION bin)
 
-#install(FILES config/backdoor.service
-        #DESTINATION /usr/lib/systemd/system)
+install(FILES config/backdoor-reader.service config/backdoor-opener.service
+        DESTINATION /usr/lib/systemd/system)
 
-#install(FILES config/backdoor.conf DESTINATION /etc)
+install(FILES config/backdoor.conf DESTINATION /etc)
 endif()
 
 include_directories(${jsoncpp_INCLUDE_DIR})
