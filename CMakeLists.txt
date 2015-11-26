@@ -36,8 +36,8 @@ target_link_libraries(nfc-cpp-wrapper bd-commands)
 
 # Create executable for nfc personalisation
 if (WIN32)
-add_executable(nfc-personalize src/nfc_personalize.cpp)
-target_link_libraries(nfc-personalize nfc-cpp-wrapper)
+  add_executable(nfc-personalize src/nfc_personalize.cpp)
+  target_link_libraries(nfc-personalize nfc-cpp-wrapper)
 endif()
 
 
@@ -50,9 +50,6 @@ add_executable(nfc-test-producer src/nfc_test_producer.cpp)
 
 # only build opener on linux
 if(UNIX)
-  #add_executable(nfc-reader src/nfc_reader.cpp src/bd_client.cpp)
-  #target_link_libraries(nfc-reader nfc-cpp-wrapper)
-
   add_executable(nfc-opener src/nfc_opener.cpp)
   target_link_libraries(nfc-opener bd-commands)
 endif()
@@ -77,12 +74,6 @@ endif()
 include_directories(${jsoncpp_INCLUDE_DIR})
 target_link_libraries(bd-commands jsoncpp)
 
-option(USE_GPERF "link gperf (Google performance measurement tools" ON)
-
-if (USE_GPERF)
-  set (CMAKE_SHARED_LINKER_FLAGS"-lprofiler")
-endif (USE_GPERF)
-
 
 # On Windows, add a BOOST_ROOT variable, which can be used to enter the
 # location of Boot
@@ -105,7 +96,7 @@ if (Boost_FOUND)
   target_link_libraries(nfc-test-client ${Boost_LIBRARIES})
 
   if (WIN32)
-	  target_link_libraries(nfc-personalize ${Boost_LIBRARIES})
+    target_link_libraries(nfc-personalize ${Boost_LIBRARIES})
   endif()
 
   if (UNIX)
@@ -146,7 +137,7 @@ if (UNIX)
   find_package(wiringPi REQUIRED)
 
 include_directories(${WIRINGPI_INCLUDE_DIR})
-#target_link_libraries(nfc-reader ${WIRINGPI_LIBRARY})
+
 target_link_libraries(nfc-opener ${WIRINGPI_LIBRARY})
 endif()
 
@@ -163,24 +154,21 @@ find_package(libfreefare REQUIRED)
 include_directories(${LIBFREEFARE_INCLUDE_DIR})
 target_link_libraries(nfc-cpp-wrapper ${LIBFREEFARE_LIBRARY})
 
-
-target_link_libraries(nfc-reader-amqp ${LIBFREEFARE_LIBRARY})
-target_link_libraries(nfc-reset ${LIBFREEFARE_LIBRARY})
-
 find_package(librabbitmq REQUIRED)
 include_directories(${LIBRABBITMQ_INCLUDE_DIR})
 target_link_libraries(nfc-test-client ${LIBRABBITMQ_LIBRARY})
 target_link_libraries(nfc-test-producer ${LIBRABBITMQ_LIBRARY} )
 target_link_libraries(nfc-reader-amqp ${LIBRABBITMQ_LIBRARY})
 
-if (UNIX)
-  target_link_libraries(nfc-opener ${LIBRABBITMQ_LIBRARY})
-endif()
 include_directories(src/)
 
-
-if (WIN32)
 find_package(simpleamqpclient REQUIRED)
 include_directories(${SIMPLEAMQPCLIENT_INCLUDE_DIR})
-target_link_libraries(nfc-personalize ${SIMPLEAMQPCLIENT_LIBRARY})
+
+if (UNIX)
+  target_link_libraries(nfc-opener ${SIMPLEAMQPCLIENT_LIBRARY})
+endif()
+
+if (WIN32)
+  target_link_libraries(nfc-personalize ${SIMPLEAMQPCLIENT_LIBRARY})
 endif()

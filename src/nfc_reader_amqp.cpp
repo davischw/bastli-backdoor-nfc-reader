@@ -20,7 +20,6 @@
 
 #include <NfcTokenReader.hpp>
 
-
 namespace logging = boost::log;
 namespace po = boost::program_options;
 
@@ -33,8 +32,8 @@ int main(int argc, char *argv[]) {
   desc.add_options()("help", "show help message")(
       "host", po::value<std::string>(), "backdoor server host")(
       "port", po::value<int>()->default_value(5672), "backdoor server port")(
-      "user", po::value<std::string>(), "rabbitmq user")(
-      "password", po::value<std::string>(), "rabbitmq pw")(
+      "user", po::value<std::string>(),
+      "rabbitmq user")("password", po::value<std::string>(), "rabbitmq pw")(
       "device_id", po::value<int>(), "device identification");
 
   po::variables_map vm;
@@ -86,7 +85,9 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  auto resp =  amqp_login(conn, "/", AMQP_DEFAULT_MAX_CHANNELS, AMQP_DEFAULT_FRAME_SIZE, 0, AMQP_SASL_METHOD_PLAIN, user.c_str(), pw.c_str());
+  auto resp =
+      amqp_login(conn, "/", AMQP_DEFAULT_MAX_CHANNELS, AMQP_DEFAULT_FRAME_SIZE,
+                 0, AMQP_SASL_METHOD_PLAIN, user.c_str(), pw.c_str());
 
   if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
     BOOST_LOG_TRIVIAL(error) << "Failed to login to broker";
@@ -98,68 +99,70 @@ int main(int argc, char *argv[]) {
   amqp_channel_open(conn, 1);
   resp = amqp_get_rpc_reply(conn);
   if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
-	BOOST_LOG_TRIVIAL(error) << "Failed to open channel";
-	exit(1);
+    BOOST_LOG_TRIVIAL(error) << "Failed to open channel";
+    exit(1);
   }
 
   /*
-  amqp_exchange_declare(conn, 1, amqp_cstring_bytes(exchange_name.c_str()), amqp_cstring_bytes("topic"), 0, 0, 0, 0, amqp_empty_table);
+  amqp_exchange_declare(conn, 1, amqp_cstring_bytes(exchange_name.c_str()),
+  amqp_cstring_bytes("topic"), 0, 0, 0, 0, amqp_empty_table);
   resp = amqp_get_rpc_reply(conn);
   if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
-	BOOST_LOG_TRIVIAL(error) << "Failed to declare exchange";
-	exit(1);
+        BOOST_LOG_TRIVIAL(error) << "Failed to declare exchange";
+        exit(1);
   } */
 
   LockedQueue<Token> token_read;
   NfcTokenReader reader(&token_read);
   reader.start();
 
-
   auto routing_key = (boost::format("basics.access.%d") % device_id).str();
 
   bool running = true;
-  
+
   while (running) {
 
     if (token_read.size() == 0) {
-	    //wait for condition variable
-	    std::unique_lock<std::mutex> mlock(token_read.lock);
-	    BOOST_LOG_TRIVIAL(trace) << "Waiting for token...";
-	    token_read.object_added.wait_for(mlock, std::chrono::seconds(5));    
+      // wait for condition variable
+      std::unique_lock<std::mutex> mlock(token_read.lock);
+      BOOST_LOG_TRIVIAL(trace) << "Waiting for token...";
+      token_read.object_added.wait_for(mlock, std::chrono::seconds(5));
     }
-
 
     if (token_read.size() > 0) {
       BOOST_LOG_TRIVIAL(info) << "Read token!";
       auto token = token_read.pop();
 
-      std::string cmd = (boost::format("{ \"cmd\": { \"token\": \"%s\"} }") % token.to_string()).str();
+      std::string cmd = (boost::format("{ \"cmd\": { \"token\": \"%s\"} }") %
+                         token.to_string()).str();
 
-      BOOST_LOG_TRIVIAL(debug) << "Routing: " << routing_key << ", json: " << cmd;
-      
-	  amqp_basic_publish(conn, 1, amqp_cstring_bytes(exchange_name.c_str()), amqp_cstring_bytes(routing_key.c_str()), 0, 0, NULL,amqp_cstring_bytes(cmd.c_str()));
-	  resp = amqp_get_rpc_reply(conn);
-	  if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
-		BOOST_LOG_TRIVIAL(error) << "Failed to publish message";
-		exit(1);
-	  }
+      BOOST_LOG_TRIVIAL(debug) << "Routing: " << routing_key
+                               << ", json: " << cmd;
+
+      amqp_basic_publish(conn, 1, amqp_cstring_bytes(exchange_name.c_str()),
+                         amqp_cstring_bytes(routing_key.c_str()), 0, 0, NULL,
+                         amqp_cstring_bytes(cmd.c_str()));
+      resp = amqp_get_rpc_reply(conn);
+      if (resp.reply_type != AMQP_RESPONSE_NORMAL) {
+        BOOST_LOG_TRIVIAL(error) << "Failed to publish message";
+        exit(1);
+      }
     }
 
     auto last_reader_update = system_clock::now() - reader.last_update;
 
     if (last_reader_update > std::chrono::seconds(5)) {
-	BOOST_LOG_TRIVIAL(warning) << "Reader br0kn, shutting down..";
-        running = false;
+      BOOST_LOG_TRIVIAL(warning) << "Reader br0kn, shutting down..";
+      running = false;
+      std::exit(1);
     } else {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
   }
-
 
   resp = amqp_channel_close(conn, 1, AMQP_REPLY_SUCCESS);
   resp = amqp_connection_close(conn, AMQP_REPLY_SUCCESS);
   status = amqp_destroy_connection(conn);
-
 
   BOOST_LOG_TRIVIAL(info) << "Program finished, shutting down";
 
