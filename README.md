@@ -50,7 +50,7 @@ user, adds it to the dialout group (needed for access rights to usb serial ports
 and then enable automatic startup.
 
     $ sudo adduser backdoor --system --no-create-home --group
-    $ sudo usermod -a -G dialout backdoor
+    $ sudo usermod -a -G dialout,gpio backdoor
     $ sudo systemctl enable backdoor-reader
     $ sudo systemctl enable backdoor-opener
 
